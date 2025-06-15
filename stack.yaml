@@ -17,8 +17,10 @@
 #
 # snapshot: ./custom-snapshot.yaml
 # snapshot: https://example.com/snapshots/2024-01-01.yaml
-snapshot:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/24.yaml
+# snapshot:
+  # url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/24.yaml
+snapshot: lts-22.43
+
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.

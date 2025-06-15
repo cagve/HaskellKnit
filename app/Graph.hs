@@ -151,3 +151,5 @@ drawColorPattern :: Int -> Int -> [PixelRGBA8] -> [[Stitch]] -> Image PixelRGBA8
 drawColorPattern size borderThickness colors pattern =
   let patternRow = map (drawColorRow size borderThickness colors) pattern
   in combineManyVertical patternRow
+
+

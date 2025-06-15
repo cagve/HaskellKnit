@@ -3,8 +3,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 import Servant
+import Codec.Picture (DynamicImage (..), Image (..), PixelRGBA8 (..), savePngImage)
 import Network.Wai.Handler.Warp (run)
 import Servant.Multipart
 import Data.Text (Text)
@@ -15,15 +17,37 @@ import Control.Monad.IO.Class (liftIO)
 import GHC.Generics (Generic)
 import System.FilePath ((</>))
 import qualified Data.Map as M
-import Data.Aeson (ToJSON)
+import Data.Aeson (FromJSON, ToJSON)
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Cors
 import Explain
 import Parser
+import Graph
 import qualified Data.ByteString.Char8 as BS
 
 
 uploadDir = "patterns"
+
+data ImageRequest = ImageRequest
+  { patternStr :: Text,
+    colors :: [Text]
+  } deriving (Generic, Show)
+instance FromJSON ImageRequest
+
+data ImageResponse = ImageResponse
+  { imageSuccess :: Bool
+  , imageMsg     :: Text
+  } deriving (Generic, Show)
+instance ToJSON ImageResponse
+
+
+
+instance FromMultipart Mem ImageRequest where
+  fromMultipart multipart = do
+    pat <- lookupInput "patternStr" multipart
+    colorStr <- lookupInput "colors" multipart
+    let colorList = T.splitOn "," colorStr
+    return $ ImageRequest pat colorList
 
 
 
@@ -73,20 +97,40 @@ successResponse exprMsg clusterMsg pat = PatternResponse
 
 -- Define la API
 type API =
-        "patterns" :> Get '[JSON] [T.Text]
-  :<|>  "patterns" :> MultipartForm Mem (MultipartData Mem) :> Post '[JSON] UploadResponse
-  :<|>  "patterns" :> Capture "filename" String :> Get '[JSON] PatternResponse
-  :<|>  "delete" :> Capture "filename" String :> Delete '[JSON] DeleteResponse
+        "patterns"  :> Get '[JSON] [T.Text]
+  :<|>  "patterns"  :> MultipartForm Mem (MultipartData Mem) :> Post '[JSON] UploadResponse
+  :<|>  "patterns"  :> Capture "filename" String :> Get '[JSON] PatternResponse
+  :<|>  "delete"    :> Capture "filename" String :> Delete '[JSON] DeleteResponse
+  :<|>  "image"     :> MultipartForm Mem ImageRequest :> Post '[JSON] ImageResponse
 
 server :: Server API
-server = listPatternsHandler:<|> uploadHandler :<|> patternHandler :<|> deleteHandler
+server = listPatternsHandler:<|> uploadHandler :<|> patternHandler :<|> deleteHandler :<|> imageHandler
+
+
+imageHandler :: ImageRequest -> Handler ImageResponse
+imageHandler req = do
+  let colors = [ PixelRGBA8 180 215 242 255
+               , PixelRGBA8 238 28 37 255
+               , PixelRGBA8 255 202 10 255
+               ]
+  maybeResult <- liftIO $ processFile (T.unpack $ patternStr req)
+  imageMsg <- case maybeResult of
+    Nothing -> return "Error procesando el patrón."
+    Just (_pattern, evaluated) -> do
+      let colorsImg = drawColorPattern 90 2 colors evaluated
+      liftIO $ savePngImage "resultado.png" (ImageRGBA8 colorsImg)
+      return "Imagen creada con éxito."
+  return ImageResponse
+    { imageSuccess = maybeResult /= Nothing
+    , imageMsg = imageMsg
+    }
 
 listPatternsHandler :: Handler [T.Text]
 listPatternsHandler = do
   files <- liftIO $ do
     createDirectoryIfMissing True uploadDir -- asegúrate que el directorio exista
     listDirectory uploadDir
-  return $ (map T.pack files)
+  return $ map T.pack files
 
 
 uploadHandler :: MultipartData Mem -> Handler UploadResponse
@@ -143,6 +187,23 @@ patternHandler filename = do
                 (Just $ T.pack explanationCluster)
                 (Just patternEvaluated)
 
+
+processFile :: String -> IO (Maybe (Pattern, [[Stitch]]))
+processFile filename = do
+  let filePath = uploadDir </> filename
+  exists <- liftIO $ doesFileExist filePath
+  if not exists
+    then
+      return $ Nothing 
+    else do
+      parsed <- liftIO $ parsePatternFile filePath
+      case parsed of
+        Left err -> return $ Nothing
+        Right pattern ->
+          case runEval 40 pattern of
+            Left err -> return $ Nothing
+            Right evaluated -> do
+              return $ Just (pattern, evaluated)
 
 
 -- Aplicación WAI
