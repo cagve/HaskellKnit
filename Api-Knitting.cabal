@@ -1,0 +1,49 @@
+cabal-version:       2.2
+
+name:                Api-Knitting
+version:             0.1.0.0
+-- synopsis:
+-- description:
+homepage:            https://github.com/githubuser/my-api-project#readme
+license:             BSD-3-Clause
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2025 Author name here
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+                     CHANGELOG.md
+
+
+executable my-api-project-exe
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  other-modules:       Parser, Explain
+  build-depends:       base >=4.7 && <5,
+                        servant,
+                        servant-server,
+                        attoparsec-aeson,
+                        aeson,
+                        warp,
+                        wai,
+                        transformers,
+                        mtl,
+                        aeson,
+                        parsec,
+                        text, 
+                        wai, 
+                        wai-cors,
+                        servant-multipart,
+                        aeson,
+                        directory,
+                        filepath,
+                        bytestring,
+                        network,
+                        containers
+
+
+  default-language:    Haskell2010
+  hs-source-dirs:      app
+
+
