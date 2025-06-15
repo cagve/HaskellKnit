@@ -10,16 +10,22 @@ import Servant.Multipart
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
-import System.Directory (removeFile, doesFileExist, createDirectoryIfMissing)
+import System.Directory (removeFile, doesFileExist, createDirectoryIfMissing, listDirectory)
 import Control.Monad.IO.Class (liftIO)
 import GHC.Generics (Generic)
 import System.FilePath ((</>))
 import qualified Data.Map as M
 import Data.Aeson (ToJSON)
-import Parser
+import Network.Wai.Handler.Warp (run)
+import Network.Wai.Middleware.Cors
 import Explain
+import Parser
+import qualified Data.ByteString.Char8 as BS
+
 
 uploadDir = "patterns"
+
+
 
 -- Respuesta para upload
 data UploadResponse = UploadResponse
@@ -67,12 +73,21 @@ successResponse exprMsg clusterMsg pat = PatternResponse
 
 -- Define la API
 type API =
-        "patterns" :> MultipartForm Mem (MultipartData Mem) :> Post '[JSON] UploadResponse
+        "patterns" :> Get '[JSON] [T.Text]
+  :<|>  "patterns" :> MultipartForm Mem (MultipartData Mem) :> Post '[JSON] UploadResponse
   :<|>  "patterns" :> Capture "filename" String :> Get '[JSON] PatternResponse
   :<|>  "delete" :> Capture "filename" String :> Delete '[JSON] DeleteResponse
 
 server :: Server API
-server = uploadHandler :<|> patternHandler :<|> deleteHandler
+server = listPatternsHandler:<|> uploadHandler :<|> patternHandler :<|> deleteHandler
+
+listPatternsHandler :: Handler [T.Text]
+listPatternsHandler = do
+  files <- liftIO $ do
+    createDirectoryIfMissing True uploadDir -- asegúrate que el directorio exista
+    listDirectory uploadDir
+  return $ (map T.pack files)
+
 
 uploadHandler :: MultipartData Mem -> Handler UploadResponse
 uploadHandler multipartData = do
@@ -83,10 +98,15 @@ uploadHandler multipartData = do
       let fileName = fdFileName file
           fileContent = fdPayload file
           filePath = uploadDir </> T.unpack fileName
-      liftIO $ do
-        createDirectoryIfMissing True uploadDir
-        BL.writeFile filePath fileContent
-      return $ UploadResponse True ("Archivo subido a " <> T.pack filePath)
+      exists <- liftIO $ doesFileExist filePath
+      if exists 
+        then do 
+            return $ UploadResponse True ("Archivo "<> T.pack filePath <> " ya existe.")
+          else
+            liftIO $ do
+              createDirectoryIfMissing True uploadDir
+              BL.writeFile filePath fileContent
+              return $ UploadResponse True ("Archivo subido a " <> T.pack filePath)
 
 -- Handler para borrar archivos
 deleteHandler :: String -> Handler DeleteResponse
@@ -131,6 +151,10 @@ app = serve (Proxy :: Proxy API) server
 
 main :: IO ()
 main = do
+  let corsPolicy = simpleCorsResourcePolicy
+        { corsOrigins = Nothing -- permite todos los orígenes
+          , corsMethods = [BS.pack "GET", BS.pack "POST", BS.pack "DELETE"]
+        }
+      corsMiddleware = cors (const $ Just corsPolicy)
   putStrLn "Servidor ejecutándose en http://localhost:8080"
-  run 8080 (serve (Proxy :: Proxy API) server)
-
+  run 8080 $ corsMiddleware app

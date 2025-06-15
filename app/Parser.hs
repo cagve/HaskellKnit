@@ -282,7 +282,7 @@ stitchToLongStr SSK = "Slip Slip Knit"
 stitchToLongStr CO = "Cast on"
 stitchToLongStr S2KP2 = "Slip 2, knit 1 and pass slipped stitch over"
 stitchToLongStr (KTOG n) = "Knit " ++ [intToDigit n] ++ " together"
-stitchToLongStr (C n) = "Color 1" ++ [intToDigit n] 
+stitchToLongStr (C n) = "Color" ++ [intToDigit (n+1) ] 
 
 stitchToStr :: Stitch -> String
 stitchToStr K = "K"
