@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -10,6 +10,7 @@ import Codec.Picture (DynamicImage (..), Image (..), PixelRGBA8 (..), savePngIma
 import Network.Wai.Handler.Warp (run)
 import Servant.Multipart
 import Data.Text (Text)
+import Network.Wai.Middleware.Static
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import System.Directory (removeFile, doesFileExist, createDirectoryIfMissing, listDirectory)
@@ -30,13 +31,14 @@ uploadDir = "patterns"
 
 data ImageRequest = ImageRequest
   { patternStr :: Text,
-    colors :: [Text]
+    colorList :: [Text]
   } deriving (Generic, Show)
 instance FromJSON ImageRequest
 
 data ImageResponse = ImageResponse
   { imageSuccess :: Bool
   , imageMsg     :: Text
+  , imageUrl :: Maybe Text
   } deriving (Generic, Show)
 instance ToJSON ImageResponse
 
@@ -45,7 +47,7 @@ instance ToJSON ImageResponse
 instance FromMultipart Mem ImageRequest where
   fromMultipart multipart = do
     pat <- lookupInput "patternStr" multipart
-    colorStr <- lookupInput "colors" multipart
+    colorStr <- lookupInput "colorList" multipart
     let colorList = T.splitOn "," colorStr
     return $ ImageRequest pat colorList
 
@@ -106,24 +108,46 @@ type API =
 server :: Server API
 server = listPatternsHandler:<|> uploadHandler :<|> patternHandler :<|> deleteHandler :<|> imageHandler
 
-
 imageHandler :: ImageRequest -> Handler ImageResponse
 imageHandler req = do
-  let colors = [ PixelRGBA8 180 215 242 255
-               , PixelRGBA8 238 28 37 255
-               , PixelRGBA8 255 202 10 255
-               ]
+  let colorNames = map T.unpack (colorList req)
+      fileName   = T.unpack (patternStr req)
+      imgPath    = "img/" ++ fileName ++ ".png"
+      imgUrl     = T.pack imgPath
   maybeResult <- liftIO $ processFile (T.unpack $ patternStr req)
-  imageMsg <- case maybeResult of
-    Nothing -> return "Error procesando el patrón."
+  case maybeResult of
+    Nothing -> return ImageResponse
+      { imageSuccess = False
+      , imageMsg = "Error procesando el patrón."
+      , imageUrl = Nothing
+      }
     Just (_pattern, evaluated) -> do
-      let colorsImg = drawColorPattern 90 2 colors evaluated
-      liftIO $ savePngImage "resultado.png" (ImageRGBA8 colorsImg)
-      return "Imagen creada con éxito."
-  return ImageResponse
-    { imageSuccess = maybeResult /= Nothing
-    , imageMsg = imageMsg
-    }
+      -- Convertimos los colores del request
+      let colorNames = map T.unpack (colorList req)
+      colorResults <- liftIO $ mapM getColorFromCSV colorNames
+      case sequence colorResults of
+        Left errMsg -> return ImageResponse
+          { imageSuccess = False
+          , imageMsg = T.pack errMsg
+          , imageUrl = Nothing
+          }
+        Right colorsRGB ->
+          case drawColorPattern 90 2 colorsRGB evaluated of
+            Left err -> return ImageResponse
+              { imageSuccess = False
+              , imageMsg = T.pack err
+              , imageUrl = Nothing
+              }
+            Right colorsImg -> do
+              liftIO $ savePngImage imgPath (ImageRGBA8 colorsImg)
+              imgData <- liftIO $ BL.readFile imgPath
+              let base64Img = TL.toStrict $ TLE.decodeUtf8 $ B64.encode imgData
+              return ImageResponse
+                { imageSuccess = True
+                , imageMsg = "Imagen creada con éxito."
+                , imageUrl = Just imgUrl
+                }
+
 
 listPatternsHandler :: Handler [T.Text]
 listPatternsHandler = do
@@ -209,13 +233,16 @@ processFile filename = do
 -- Aplicación WAI
 app :: Application
 app = serve (Proxy :: Proxy API) server
-
 main :: IO ()
 main = do
   let corsPolicy = simpleCorsResourcePolicy
-        { corsOrigins = Nothing -- permite todos los orígenes
-          , corsMethods = [BS.pack "GET", BS.pack "POST", BS.pack "DELETE"]
+        { corsOrigins = Nothing
+        , corsMethods = ["GET", "POST", "DELETE", "OPTIONS"]
+        , corsRequestHeaders = ["Content-Type", "Authorization"]
         }
       corsMiddleware = cors (const $ Just corsPolicy)
+      staticMiddleware = staticPolicy (addBase "img")  -- aquí sirve archivos desde /img
+
   putStrLn "Servidor ejecutándose en http://localhost:8080"
-  run 8080 $ corsMiddleware app
+
+  run 8080 $ corsMiddleware $ staticMiddleware app

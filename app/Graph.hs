@@ -1,9 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Graph  where
 
 import Codec.Picture (readImage, convertRGBA8, savePngImage, Image(..), PixelRGBA8, DynamicImage(..))
 import Codec.Picture.Types (pixelAt, generateImage, PixelRGBA8(..))
 import System.Directory (listDirectory)
 import System.FilePath ((</>), takeExtension)
+import Data.Csv
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Set as Set
+import qualified Data.Vector as V
+
 import Parser
 import Print
 
@@ -147,9 +155,33 @@ drawColorRow size borderThickness colors row =
   let squares = map (drawColorFromStitch size borderThickness colors) row
   in combineManyHorizontal squares
 
-drawColorPattern :: Int -> Int -> [PixelRGBA8] -> [[Stitch]] -> Image PixelRGBA8
+drawColorPattern :: Int -> Int -> [PixelRGBA8] -> [[Stitch]] -> Either String (Image PixelRGBA8)
 drawColorPattern size borderThickness colors pattern =
-  let patternRow = map (drawColorRow size borderThickness colors) pattern
-  in combineManyVertical patternRow
+  let numUsedColors = getNumberOfColors pattern
+      numInputColors = length colors
+  in if numInputColors /= numUsedColors
+     then Left $
+       "ERROR: Se proporcionaron " ++ show numInputColors ++ " colores, pero el patrón usa " ++ show numUsedColors
+     else
+       let patternRow = map (drawColorRow size borderThickness colors) pattern
+       in Right $ combineManyVertical patternRow
 
+
+getNumberOfColors :: [[Stitch]] -> Int
+getNumberOfColors pattern =
+  let flat = concat pattern
+      unique = Set.fromList flat  -- o: Set.fromList (map stitchColor flat)
+  in Set.size unique
+
+getColorFromCSV :: String -> IO (Either String PixelRGBA8)
+getColorFromCSV colorName = do
+  csvData <- BL.readFile "rec/colors.csv"
+  case decode NoHeader csvData :: Either String (V.Vector (String, String, String, Int, Int, Int)) of
+    Left err -> return $ Left $ "Error al leer CSV: " ++ err
+    Right v ->
+      case V.find (\(shortName,_,_,_,_,_) -> shortName == colorName) v of
+        Just (_, _, _, r, g, b) ->
+          return $ Right $ PixelRGBA8 (fromIntegral r) (fromIntegral g) (fromIntegral b) 255
+        Nothing ->
+          return $ Left $ "Color no encontrado: " ++ colorName
 

@@ -30,7 +30,7 @@ parsePatternFile filePath = do
   return $ parsePattern input
 
 
-data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq) 
+data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord) 
 
 data Expr
   = Single Stitch

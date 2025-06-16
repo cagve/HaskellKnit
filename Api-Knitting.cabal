@@ -42,7 +42,11 @@ executable my-api-project-exe
                         bytestring,
                         network,
                         containers,
-                        split
+                        split,
+                        vector,
+                        wai-middleware-static,
+                        base64-bytestring,
+                        cassava
 
 
   default-language:    Haskell2010
