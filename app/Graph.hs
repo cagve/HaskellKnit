@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Graph  where
@@ -11,9 +12,17 @@ import Data.Csv
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Set as Set
 import qualified Data.Vector as V
-
+import GHC.Generics (Generic)
+import Data.Aeson (FromJSON, ToJSON)
 import Parser
 import Print
+
+data RGB = RGB
+  { r :: Int,
+    g :: Int,
+    b :: Int
+  } deriving (Generic, Show)
+instance FromJSON RGB
 
 recFolder :: String
 recFolder = "rec"
@@ -166,6 +175,8 @@ drawColorPattern size borderThickness colors pattern =
        let patternRow = map (drawColorRow size borderThickness colors) pattern
        in Right $ combineManyVertical patternRow
 
+convertRGBintoPixelRGBA8 :: RGB -> PixelRGBA8 
+convertRGBintoPixelRGBA8 (RGB r g b) = PixelRGBA8 (fromIntegral r) (fromIntegral g) (fromIntegral b) 255
 
 getNumberOfColors :: [[Stitch]] -> Int
 getNumberOfColors pattern =

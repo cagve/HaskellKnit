@@ -6,19 +6,23 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 import Servant
-import Codec.Picture (DynamicImage (..), Image (..), PixelRGBA8 (..), savePngImage)
+import Codec.Picture
 import Network.Wai.Handler.Warp (run)
 import Servant.Multipart
 import Data.Text (Text)
 import Network.Wai.Middleware.Static
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Lazy as TL
 import System.Directory (removeFile, doesFileExist, createDirectoryIfMissing, listDirectory)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Base64.Lazy as B64
 import GHC.Generics (Generic)
 import System.FilePath ((</>))
 import qualified Data.Map as M
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON, ToJSON, eitherDecode)
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Cors
 import Explain
@@ -31,7 +35,7 @@ uploadDir = "patterns"
 
 data ImageRequest = ImageRequest
   { patternStr :: Text,
-    colorList :: [Text]
+    colorList ::  [RGB]
   } deriving (Generic, Show)
 instance FromJSON ImageRequest
 
@@ -39,6 +43,7 @@ data ImageResponse = ImageResponse
   { imageSuccess :: Bool
   , imageMsg     :: Text
   , imageUrl :: Maybe Text
+  , colorsNumber :: Int
   } deriving (Generic, Show)
 instance ToJSON ImageResponse
 
@@ -47,10 +52,10 @@ instance ToJSON ImageResponse
 instance FromMultipart Mem ImageRequest where
   fromMultipart multipart = do
     pat <- lookupInput "patternStr" multipart
-    colorStr <- lookupInput "colorList" multipart
-    let colorList = T.splitOn "," colorStr
-    return $ ImageRequest pat colorList
-
+    colorJson <- lookupInput "colorList" multipart
+    case eitherDecode (BS.fromStrict $ TE.encodeUtf8 colorJson) of
+      Left err -> Left ("Error al parsear colorListJson: " ++ err)
+      Right colorList -> Right $ ImageRequest pat colorList
 
 
 -- Respuesta para upload
@@ -110,43 +115,35 @@ server = listPatternsHandler:<|> uploadHandler :<|> patternHandler :<|> deleteHa
 
 imageHandler :: ImageRequest -> Handler ImageResponse
 imageHandler req = do
-  let colorNames = map T.unpack (colorList req)
-      fileName   = T.unpack (patternStr req)
+  let fileName   = T.unpack (patternStr req)
       imgPath    = "img/" ++ fileName ++ ".png"
-      imgUrl     = T.pack imgPath
+      imgBase64     = T.pack imgPath
   maybeResult <- liftIO $ processFile (T.unpack $ patternStr req)
   case maybeResult of
     Nothing -> return ImageResponse
       { imageSuccess = False
       , imageMsg = "Error procesando el patrón."
       , imageUrl = Nothing
+      , colorsNumber = 0
       }
     Just (_pattern, evaluated) -> do
-      -- Convertimos los colores del request
-      let colorNames = map T.unpack (colorList req)
-      colorResults <- liftIO $ mapM getColorFromCSV colorNames
-      case sequence colorResults of
-        Left errMsg -> return ImageResponse
-          { imageSuccess = False
-          , imageMsg = T.pack errMsg
-          , imageUrl = Nothing
-          }
-        Right colorsRGB ->
-          case drawColorPattern 90 2 colorsRGB evaluated of
-            Left err -> return ImageResponse
-              { imageSuccess = False
-              , imageMsg = T.pack err
-              , imageUrl = Nothing
+      let colorsRGB = map convertRGBintoPixelRGBA8 (colorList req)
+      case drawColorPattern 90 2 colorsRGB evaluated of
+          Left err -> return ImageResponse
+            { imageSuccess = False
+            , imageMsg = T.pack err
+            , imageUrl = Nothing
+            , colorsNumber = 0
+            }
+          Right colorsImg -> do
+            let imgData = encodePng colorsImg
+                base64Img = TL.toStrict $ TLE.decodeUtf8 $ B64.encode imgData
+            return ImageResponse
+              { imageSuccess = True
+              , imageMsg = "Imagen creada con éxito."
+              , imageUrl = Just base64Img
+              , colorsNumber = getNumberOfColors evaluated
               }
-            Right colorsImg -> do
-              liftIO $ savePngImage imgPath (ImageRGBA8 colorsImg)
-              imgData <- liftIO $ BL.readFile imgPath
-              let base64Img = TL.toStrict $ TLE.decodeUtf8 $ B64.encode imgData
-              return ImageResponse
-                { imageSuccess = True
-                , imageMsg = "Imagen creada con éxito."
-                , imageUrl = Just imgUrl
-                }
 
 
 listPatternsHandler :: Handler [T.Text]
