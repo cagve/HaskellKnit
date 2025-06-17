@@ -15,6 +15,7 @@ import qualified Data.Vector as V
 import GHC.Generics (Generic)
 import Data.Aeson (FromJSON, ToJSON)
 import Parser
+import Explain
 import Print
 
 data RGB = RGB
@@ -159,6 +160,18 @@ drawColorFromStitch size borderThickness colors st =
   let (fillColor, borderColor) = stitchToColor colors st
   in drawSquare size borderThickness fillColor borderColor
 
+drawColorFromCluster :: Int -> Int -> [PixelRGBA8] -> Cluster -> Image PixelRGBA8
+drawColorFromCluster size borderThickness colors (stitch, count) =
+  let stitchImg = drawColorFromStitch size borderThickness colors stitch
+      clusterImgs = replicate count stitchImg
+  in combineManyHorizontal clusterImgs
+
+drawColorClusterRow :: Int -> Int -> [PixelRGBA8] -> [Stitch] -> Image PixelRGBA8
+drawColorClusterRow size borderThickness colors row =
+  let clusters = cluster row           
+      clusterImgs = map (drawColorFromCluster size borderThickness colors) clusters  
+  in combineManyHorizontal clusterImgs
+  
 drawColorRow :: Int -> Int -> [PixelRGBA8] -> [Stitch] -> Image PixelRGBA8
 drawColorRow size borderThickness colors row =
   let squares = map (drawColorFromStitch size borderThickness colors) row
@@ -172,7 +185,7 @@ drawColorPattern size borderThickness colors pattern =
      then Left $
        "ERROR: Se proporcionaron " ++ show numInputColors ++ " colores, pero el patrón usa " ++ show numUsedColors
      else
-       let patternRow = map (drawColorRow size borderThickness colors) pattern
+       let patternRow = map (drawColorClusterRow size borderThickness colors) pattern
        in Right $ combineManyVertical patternRow
 
 convertRGBintoPixelRGBA8 :: RGB -> PixelRGBA8 
