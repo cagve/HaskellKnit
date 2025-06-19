@@ -1,0 +1,278 @@
+/* COLOR PALETTE */ 
+/* Marron: #4B352A */
+/* Naranja: #CA7842*/
+/* Verde: #B2CD9C */
+/* Blacno: #F0F2BD */
+
+
+
+body {
+	font-family: 'Segoe UI', sans-serif;
+	background-color: #f4f4f4;
+	display: grid;
+	grid-template-columns: 20% 80%;
+	grid-template-rows: auto;
+	grid-template-areas: 
+	"header header"
+	"aside  section";
+	gap: 15px 10px;
+}
+
+header {
+	gred-area: header;
+	background: #CA7842;
+}
+
+aside{
+	grid-area: aside;
+	border-style: solid;
+	border-radius: 12px;
+	padding:1em;
+}
+
+section {
+	grid-area: section;
+	border-style: solid;
+	border-radius: 12px;
+	padding:1em;
+	/* height: auto; */
+	/* font-family: Arial, sans-serif; */
+	/* width:100%; */
+	/* margin-top: 1rem; */
+	/* display:flex; */
+	/* flex-direction:column; */
+	/* align-items:center; */
+	/* gap: 20px; */
+}
+
+#radioBoxes{
+	/* display:none; */
+}
+
+/* Estilo para los contenedores principales */
+.shadow-box {
+	/* background-color: white; */
+	/* padding: 20px; */
+	/* border-radius: 12px; */
+	/* box-shadow: 0 4px 8px rgba(0,0,0,0.1); */
+}
+
+
+section {
+}
+
+
+#colorPickerBox{
+	display:flex;
+}
+
+
+#fileList ul {
+	list-style: none;
+	padding: 0;
+}
+
+#fileList li {
+	background: white;
+	margin: 0.5rem 0;
+	padding: 0.75rem 1rem;
+	border-radius: 6px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+a {
+	text-decoration: none;
+	color: #0077cc;
+	font-weight: 600;
+}
+
+a:hover{
+	cursor: pointer;
+}
+
+#fileSection button {
+	background: #e74c3c;
+	border: none;
+	color: white;
+	padding: 0.4rem 0.8rem;
+	border-radius: 4px;
+	cursor: pointer;
+	font-weight: 600;
+	transition: background 0.3s ease;
+}
+
+
+.ul-rows {
+	list-style-type: none;
+	width:100%;
+	counter-reset: row;
+}
+
+.ul-rows li {
+	counter-increment: row;
+	margin-bottom: 12px;
+	background-color: #f9f9f9;
+	padding: 10px;
+	border-radius: 8px;
+}
+
+.ul-rows li::before {
+	content: "Row " counter(row) ": ";
+	font-weight:600;
+}
+
+.explanationBox{
+	width:100%;
+	overflow-y:scroll;
+}
+
+/* Estilo para los checkboxes y sus etiquetas  */
+label {
+	margin-right: 20px;
+	font-weight: 600;
+	font-size: 1rem;
+	cursor: pointer;
+}
+
+input[type="radio"] {
+	margin-right: 8px;
+	transform: scale(1.2);
+}
+
+#imgBox {
+	padding: 1rem;
+	max-width: 100%;
+	display: flex;
+	width: 100%;
+	height: auto;
+	flex-direction: column;
+	align-items: center;
+}
+
+/* NAV ESTILIZADO */
+#imgNav {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.5rem;
+	flex-wrap: wrap;
+}
+
+/* BOTONES */
+#imgNav button {
+	background: #4a90e2;
+	color: white;
+	border: none;
+	padding: 0.3rem 0.7rem;
+	border-radius: 0.5rem;
+	font-size: 1.2rem;
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+#imgNav button:hover {
+	background-color: #357ab8;
+}
+
+/* INPUT COLOR */
+#imgNav input[type="color"] {
+	width: 2rem;
+	height: 2rem;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+}
+
+/* IMAGEN */
+#imgPattern {
+	width: 1000px;
+	max-width: 100%;
+	max-height: 9000px;
+	object-fit: contain;
+	flex-shrink: 0;
+}
+
+
+#loading {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	background: #ffffffdd;
+	padding: 1rem 2rem;
+	border-radius: 0.5rem;
+	font-weight: bold;
+	font-size: 1.2rem;
+	box-shadow: 0 0 10px rgba(0,0,0,0.1);
+	z-index: 999;
+}
+
+#rowNavigator {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+	padding: 10px;
+	background-color: #f5f5f5;
+	border-radius: 5px;
+}
+
+#rowNavigator button {
+	padding: 5px 10px;
+	background-color: #4a6fa5;
+	color: white;
+	border: none;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+#rowNavigator button:hover {
+	background-color: #3a5a8a;
+}
+
+#currentRowIndicator {
+	font-weight: bold;
+	min-width: 100px;
+	text-align: center;
+}
+
+#rowSlider {
+	flex-grow: 1;
+	margin: 0 10px;
+}
+
+.ul-rows li.highlighted {
+	background-color: #fffacd;
+	font-weight: bold;
+	border-left: 3px solid #ffa500;
+	padding-left: 5px;
+}
+
+.perron-checkbox {
+	display: inline-flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+	font-family: 'Segoe UI', sans-serif;
+	font-size: 1rem;
+	font-weight: 600;
+	color: #2d3748;
+	user-select: none;
+	padding: 10px 15px;
+	border-radius: 12px;
+	background-color: #f7fafc;
+	border: 2px solid #e2e8f0;
+	transition: all 0.3s ease;
+	margin: 10px;
+}
+
+#debugImg{
+	display: block;
+	position: relative;
+	padding-left: 30px;
+	cursor: pointer;
+	font-size: 18px;
+}

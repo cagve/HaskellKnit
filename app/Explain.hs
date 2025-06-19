@@ -12,13 +12,6 @@ type ClusterExpr = (Expr, Int)
 concatWithComma :: [String] -> String
 concatWithComma = foldr1 (\a b -> a ++ ", " ++ b)
 
-isWT :: Expr -> Bool
-isWT (Single WT) = True
-isWT _           = False
-
-isCO :: Expr -> Bool
-isCO (Single CO) = True
-isCO _           = False
 
 -- ||| CLUSTER EXPLAINING
 cluster :: [Stitch] -> [Cluster]

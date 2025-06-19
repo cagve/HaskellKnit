@@ -141,6 +141,24 @@ row = try (do
             return [rb])
      <|> many1 expr
 
+isWT :: Expr -> Bool
+isWT (Single WT) = True
+isWT _           = False
+
+isCO :: Expr -> Bool
+isCO (Single CO) = True
+isCO _           = False
+
+isColor :: Stitch -> Bool
+isColor (C n) = True
+isColor _     = False
+
+isColorPattern :: [[Stitch]] -> Bool
+isColorPattern pattern  = do
+  let flat = concat pattern
+  all isColor flat
+
+
 patternParser :: Parser Pattern
 patternParser = row `sepEndBy1` (char ';')
 

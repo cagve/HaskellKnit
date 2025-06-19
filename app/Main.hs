@@ -29,6 +29,7 @@ import Explain
 import Parser
 import Graph
 import qualified Data.ByteString.Char8 as BS
+import Parser (isColorPattern)
 
 
 uploadDir = "patterns"
@@ -78,6 +79,7 @@ data PatternResponse = PatternResponse
   , explanationClusterMsg :: Maybe Text
   , pattern :: Maybe [[Text]]
   , patternErrMsg :: Maybe Text
+  , colorPattern :: Bool
   } deriving (Generic, Show)
 
 instance ToJSON PatternResponse
@@ -90,15 +92,17 @@ errorResponse errMsg = PatternResponse
   , explanationClusterMsg = Nothing
   , pattern = Nothing
   , patternErrMsg = Just errMsg
+  , colorPattern  = False
   }
 
-successResponse :: Maybe Text -> Maybe Text -> Maybe [[Text]] -> PatternResponse
-successResponse exprMsg clusterMsg pat = PatternResponse
+successResponse :: Maybe Text -> Maybe Text -> Maybe [[Text]] -> Bool -> PatternResponse
+successResponse exprMsg clusterMsg pat color = PatternResponse
   { patternSuccess = True
   , explanationExprMsg = exprMsg
   , explanationClusterMsg = clusterMsg
   , pattern = pat
   , patternErrMsg = Nothing
+  , colorPattern = color
   }
 
 
@@ -128,7 +132,7 @@ imageHandler req = do
       }
     Just (_pattern, evaluated) -> do
       let colorsRGB = map convertRGBintoPixelRGBA8 (colorList req)
-      case drawColorPattern 90 2 colorsRGB evaluated of
+      case drawColorPattern 90 1 colorsRGB evaluated of
           Left err -> return ImageResponse
             { imageSuccess = False
             , imageMsg = T.pack err
@@ -203,11 +207,12 @@ patternHandler filename = do
               let patternEvaluated = convertPattern evaluated
                   explanationExpr = explainExprPattern pattern
                   explanationCluster = explainClusterPattern evaluated
+                  colorBool = isColorPattern evaluated
               return $ successResponse
                 (Just $ T.pack explanationExpr)
                 (Just $ T.pack explanationCluster)
                 (Just patternEvaluated)
-
+                colorBool
 
 processFile :: String -> IO (Maybe (Pattern, [[Stitch]]))
 processFile filename = do

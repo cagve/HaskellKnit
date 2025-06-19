@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<title>📂 Archivos disponibles</title>
+		<link rel="stylesheet" href="css2.css" />
+		<link rel="stylesheet" href="style.css" />
+	</head>
+	<body>
+		<header>
+			<h1>Knitware</h1>
+		</header>
+		<div class="container">
+			<aside id="fileSection" class="shadow-box">
+				<h2>Patterns</h2>
+
+				<form id="uploadForm">
+					<input type="file" name="file" id="fileInput" required />
+				</form>
+
+				<ul class="file-list" id = "file-list">
+					<li>Cargando archivos...</li>
+				</ul>
+			</aside>
+			<main id="patternSection" class="shadow-box">
+				<h2 id="patternTitle"> Pattern </h2>
+				<div id="radioBoxes" class="mode-switcher">
+					<input name="appState" value="0" type="radio" id="shortRadio" checked/>
+					<label for="shortRadio">Quick Glance</label>
+					<input name="appState" value="1" type="radio" id="extendedRadio" />
+					<label for="extendedRadio">Detailed Guide</label>
+					<input name="appState" value="2" type="radio" id ="imgRadio"/>
+					<label for="imgRadio">Visual Chart</label>
+					<div id="rowNavigator">
+						<button id="prevRow">⬅ Prev</button>
+						<span id="currentRowIndicator">Row</span>
+						<button id="nextRow">Next ➡</button>
+					</div>
+				</div>
+
+				<div class="pattern-content" id="explainExprBox">
+					<h3> Reduced version: </h3>
+					<ul id="patternExprInstructions" class="ul-rows"></ul>
+				</div>
+
+				<div class="pattern-content" id="explainClusterBox">
+					<h3> Long version: </h3>
+					<ul id="patternClusterInstructions" class="ul-rows"></ul>
+				</div>
+
+				<div id="loading" style="display: none;">Loading img...</div>
+
+				<div id="imgBox">
+					<canvas id="patternCanvas" width="720" height="520"></canvas>
+					<div id="emptyMessage" style=" color: #888; font-size: 20px; font-family: sans-serif; display: none; ">
+						Image not available
+					</div>
+				</div>
+			</main>
+		</div>
+		<!-- <button onclick="drawMatrix()">HOLA MUNDO</button> -->
+		<!-- <canvas id="myCanvas" width="720" height="520"></canvas> -->
+
+		<script type="module" src="app.js"></script>
+		<!-- <script src="graphics.mjs"></script> -->
+	</body>
+</html>
+
