@@ -17,7 +17,8 @@ import qualified Data.Text as T
 
 
 debug :: String -> a -> a
-debug _ x = x 
+debug _ x = x
+
 
 
 
@@ -30,7 +31,14 @@ parsePatternFile filePath = do
   return $ parsePattern input
 
 
-data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord) 
+data Measure  = Measure Int Int deriving (Show, Eq, Ord)
+data StitchTension = StitchTension Int Int deriving (Show, Eq, Ord)
+data Gauge = Gauge
+  { measureGauge :: Measure  
+  , stitchGauge :: StitchTension  
+  } deriving (Show, Eq)
+
+data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord)
 
 data Expr
   = Single Stitch
@@ -80,8 +88,8 @@ castonParser = try $ do
 
 stitch :: Parser Expr
 stitch =
-    try (castonParser)
-    <|> try (colorParser)
+    try castonParser
+    <|> try colorParser
     <|> try (char 'k' >> return (Single K))
     <|> try (char 'p' >> return (Single P))
     <|> try ktogParser
@@ -127,7 +135,7 @@ repeatBlockParser = try $ do
   n <- number
   void $ char ')'
   void $ char '{'
-  expr <- patternParser  
+  expr <- patternParser
   void $ char '}'
   return $ RepeatBlock n expr
 
@@ -160,7 +168,7 @@ isColorPattern pattern  = do
 
 
 patternParser :: Parser Pattern
-patternParser = row `sepEndBy1` (char ';')
+patternParser = row `sepEndBy1` char ';'
 
 parsePattern :: String -> Either ParseError Pattern
 parsePattern = parse (patternParser <* eof) ""
@@ -214,12 +222,12 @@ evalExprM e = case e of
     let reps = if lenSts == 0 then 0 else remaining `div` lenSts
     put (row, total, pos + reps * lenSts)
     return $ concat (replicate reps sts)
-  RepeatBlock int pattern -> 
+  RepeatBlock int pattern ->
     throwError "RepeatBlock no puede evaluarse como una expresión individual en evalExprM"
 
 
 positionOfWT :: [Stitch] -> Int
-positionOfWT  = go 0 
+positionOfWT  = go 0
   where
     go _ [] = trace "[DEBUG] WT no encontrado" 0
     go i (s:ss)
@@ -248,26 +256,24 @@ evalPatternState (r:rs) = do
       repeatedRows <- evalRepeatBlock n innerPattern
       restResult <- evalPatternState rs
       return (repeatedRows ++ restResult)
-    
-    _ -> do  
+
+    _ -> do
       (row, total, pos) <- get
       -- | Previous was a WT
       let newRowSt = if pos == 0 then r else replicate pos (Single O) ++ r
       when (pos > 0) $ put (row, total, 0)
-      (row, total, pos) <- get 
+      (row, total, pos) <- get
       firstRow <- evalRowM newRowSt
       let consumedSts = sum (map stConsume firstRow)
 
       when (row > 0 && consumedSts /= total) $
         throwError $
-          "Error: Row(" ++ show row ++ ") >> Expected sts: (" ++ show total ++ 
+          "Error: Row(" ++ show row ++ ") >> Expected sts: (" ++ show total ++
           ") /= CurrentSts: (" ++ show consumedSts ++ ")"
-      
+
       -- Calcular nuevos valores para el estado
       let newExpected = sum (map stWeight firstRow)
-      let wtPos = case WT `elem` firstRow of
-                True  -> positionOfWT firstRow
-                False -> total 
+      let wtPos = (if WT `elem` firstRow then positionOfWT firstRow else total)
       let newPos = total - wtPos
       put (row + 1, newExpected, newPos)
       restResult <- evalPatternState rs
@@ -300,7 +306,7 @@ stitchToLongStr SSK = "Slip Slip Knit"
 stitchToLongStr CO = "Cast on"
 stitchToLongStr S2KP2 = "Slip 2, knit 1 and pass slipped stitch over"
 stitchToLongStr (KTOG n) = "Knit " ++ [intToDigit n] ++ " together"
-stitchToLongStr (C n) = "Color" ++ [intToDigit (n+1) ] 
+stitchToLongStr (C n) = "Color" ++ [intToDigit (n+1) ]
 
 stitchToStr :: Stitch -> String
 stitchToStr K = "K"
@@ -314,7 +320,7 @@ stitchToStr SSK = "SSK"
 stitchToStr CO = "CO"
 stitchToStr S2KP2 = "S2KP2"
 stitchToStr (KTOG n) = "K" ++ [intToDigit n] ++ "TOG"
-stitchToStr (C n) = "C" ++ [intToDigit n] 
+stitchToStr (C n) = "C" ++ [intToDigit n]
 
 
 countStsInRow :: [Stitch] -> Int
@@ -326,7 +332,17 @@ runEval :: ExpectedSts -> Pattern -> Either String [[Stitch]]
 runEval total pat = runExcept $ evalStateT (evalPatternState pat) (0, total, 0)
 
 convertPattern :: [[Stitch]] -> [[Text]]
-convertPattern rows = map (map (T.pack . stitchToStr)) rows
+convertPattern = map (map (T.pack . stitchToStr))
 
+
+-- | Calcula el tamaño para el patron evaluado.
+calculateRowSize :: Int -> Gauge -> [[Stitch]] -> Measure
+calculateRowSize row (Gauge (Measure w h) (StitchTension s1 s2)) evaluated = Measure w1 h2 
+  where 
+    stsInRow = countStsInRow (evaluated !! row)
+    w1 = (w * stsInRow) `div` s1
+    h2 = (h * row+1) `div` s2
+
+  
 
 

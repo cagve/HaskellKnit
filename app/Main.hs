@@ -7,7 +7,6 @@
 
 import Servant
 import Codec.Picture
-import Network.Wai.Handler.Warp (run)
 import Servant.Multipart
 import Data.Text (Text)
 import Network.Wai.Middleware.Static
@@ -28,8 +27,8 @@ import Network.Wai.Middleware.Cors
 import Explain
 import Parser
 import Graph
+import Print
 import qualified Data.ByteString.Char8 as BS
-import Parser (isColorPattern)
 
 
 uploadDir = "patterns"
@@ -237,14 +236,36 @@ app :: Application
 app = serve (Proxy :: Proxy API) server
 main :: IO ()
 main = do
-  let corsPolicy = simpleCorsResourcePolicy
-        { corsOrigins = Nothing
-        , corsMethods = ["GET", "POST", "DELETE", "OPTIONS"]
-        , corsRequestHeaders = ["Content-Type", "Authorization"]
-        }
-      corsMiddleware = cors (const $ Just corsPolicy)
-      staticMiddleware = staticPolicy (addBase "img")  -- aquí sirve archivos desde /img
+  -- let corsPolicy = simpleCorsResourcePolicy
+  --       { corsOrigins = Nothing
+  --       , corsMethods = ["GET", "POST", "DELETE", "OPTIONS"]
+  --       , corsRequestHeaders = ["Content-Type", "Authorization"]
+  --       }
+  --     corsMiddleware = cors (const $ Just corsPolicy)
+  --     staticMiddleware = staticPolicy (addBase "img")  -- aquí sirve archivos desde /img
+  --
+  -- putStrLn "Servidor ejecutándose en http://localhost:8080"
+  -- run 8080 $ corsMiddleware $ staticMiddleware app
+  test
 
-  putStrLn "Servidor ejecutándose en http://localhost:8080"
+test :: IO()
+test = do 
+  let filename = "patterns/test.knit" -- archivo por defecto si no hay args
+      gauge  = Gauge (Measure 10 10) (StitchTension 5 5)
+  putStrLn $ " Usando archivo: "   ++ filename
+  result <- parsePatternFile filename
+  case result of
+    Left err -> putStrLn $ "Error  parseando archivo: " ++ show err
+    Right pattern -> do
+      putStrLn "\nAST: "
+      putStrLn $ show pattern
+      putStrLn ""
+      case runEval 40 pattern of
+        Left err -> putStrLn $ " Error in pattern.:  " ++ err
+        Right evaluated -> do
+          putStrLn "\nPatrón: "
+          putStrLn $ dshow evaluated
+          putStrLn $ pshow evaluated
+          putStrLn $ show (calculateRowSize 1 gauge evaluated)
 
-  run 8080 $ corsMiddleware $ staticMiddleware app
+
