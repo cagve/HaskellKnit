@@ -27,11 +27,11 @@ import Network.Wai.Middleware.Cors
 -- import Explain
 import Parser
 import Evaluate
+import Explain
 -- import Graph
 -- import Print
 import qualified Data.ByteString.Char8 as BS
 
---
 -- uploadDir = "patterns"
 --
 -- data ImageRequest = ImageRequest
@@ -275,6 +275,7 @@ test = do
         Right evaluated -> do
           putStrLn "\nPatrón: "
           putStrLn $ show evaluated
+          putStrLn $ show (explainExprPattern pattern)
       -- --     putStrLn $ show (calculateRowSize 72 gauge evaluated)
       --
       --

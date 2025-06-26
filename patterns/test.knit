@@ -1,6 +1,9 @@
 // HOLA MUNDO
 gauge(10,10);
-repeat(cm(20.0)){
-  0(p);
-  0(k);
+
+k k k k;
+
+repeat(cm(10.0)){
+  p p p p;
+  k k k k;
 }

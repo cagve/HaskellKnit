@@ -160,7 +160,6 @@ runEval total pat = do
       g = patGauge pat
   runExcept $ evalStateT (evalPatternState instruction) (0, total, 0, g)
 
-
 calculateRowSize :: Int -> Gauge -> [[Stitch]] -> Measure
 calculateRowSize row (Gauge (Measure w h) (StitchTension s1 s2)) evaluated = Measure w1 h2
   where

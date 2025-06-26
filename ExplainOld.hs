@@ -6,7 +6,9 @@ import Data.Char (intToDigit)
 import Data.List (group, intercalate)
 import Data.Maybe (mapMaybe)
 
+-- | Agrupación de un stitch con su cantidad consecutiva
 type Cluster = (Stitch, Int)
+-- | Agrupación de una expresión con su cantidad consecutiva
 type ClusterExpr = (Expr, Int)
 
 -- | Concatena una lista de strings separados por comas
@@ -47,15 +49,10 @@ explainStitch = stitchToStr
 -- | Explica una expresión en formato lista de líneas para mejor legibilidad
 explainExpr :: Expr -> [String]
 explainExpr expr = case expr of
-  RepeatBlock ra pat -> case ra of 
-    Times n -> do 
-      let innerLines = concatMap explainExprRow pat
-          header = "Work following for " ++ show n ++ " row" ++ (if n > 1 then "s" else "") ++ ":"
-        in header : innerLines
-    Centimeters n -> do
-      let innerLines = concatMap explainExprRow pat
-          header = "Work following for " ++ show n ++ " cm" ++ (if n > 1 then "s" else "") ++ ":"
-        in header : innerLines
+  RepeatBlock n pat ->
+    let innerLines = concatMap explainExprRow pat
+        header = "Work following for " ++ show n ++ " row" ++ (if n > 1 then "s" else "") ++ ":"
+    in header : innerLines
   Repeat 1 (firstExpr : tailExprs)
     | isWT firstExpr ->
         let tailSize = length tailExprs
@@ -90,6 +87,8 @@ explainExpr expr = case expr of
         let inner = concatWithComma (map (concat . explainExpr) exprList)
             wrapped = "*" ++ inner ++ "*"
         in ["Repeat " ++ show n ++ " times: " ++ wrapped ++ "."]
+  _ ->
+    ["(pattern element not recognized)."]
 
 -- | Explica clusters de expresiones, omitiendo "Single O"
 explainClusterExpr :: [ClusterExpr] -> [String]
@@ -108,33 +107,25 @@ explainExprRow :: [Expr] -> [String]
 explainExprRow = concatMap explainExpr
 
 explainExprPattern :: Pattern -> [String]
-explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
+explainExprPattern = go 1
   where
-    go :: Int -> [Row] -> [String]
+    go :: Int -> [[Expr]] -> [String]
     go _ [] = []
     go rowNum (exprs:rest) =
       case exprs of
-        [RepeatBlock ra pat] ->
-          let baseRowCount = length pat
-              estimatedReps = case ra of
-                Times n -> n
-                Centimeters c -> case maybeGauge of
-                  Just (Gauge (Measure rowsPerCm _) _) ->
-                    round (c * fromIntegral rowsPerCm)
-                  Nothing -> 1 
-              totalRows = baseRowCount * estimatedReps
+        [RepeatBlock n pat] ->
+          let blockRows = concatMap explainExprRow pat
+              totalRows = length pat * n
               startRow = rowNum
               endRow = rowNum + totalRows - 1
-              qtyStr = convertRepeatAmount maybeGauge ra
-              blockRows = concatMap explainExprRow pat
               summary = "Row " ++ show startRow ++ "-" ++ show endRow ++
-                        " (Repite " ++ qtyStr ++ "): " ++ summarizeBlock blockRows
+                        " (Repite " ++ show n ++ "): " ++ summarizeBlock blockRows
           in summary : go (rowNum + totalRows) rest
         _ ->
           let explanation = intercalate " · " (concatMap explainExpr exprs)
+          -- let explanation = unwords (concatMap explainExpr exprs)
               line = "Row " ++ show rowNum ++ ": " ++ explanation
           in line : go (rowNum + 1) rest
-
 
 -- Esta función toma todas las líneas del bloque y genera un resumen (puedes ajustarla a gusto)
 summarizeBlock :: [String] -> String
@@ -147,23 +138,3 @@ summarizeBlock linesInBlock =
 allEqual :: Eq a => [a] -> Bool
 allEqual [] = True
 allEqual (x:xs) = all (== x) xs
-
-convertRepeatAmount :: Maybe Gauge -> RepeatAmount -> String
-convertRepeatAmount mg ra = case ra of
-  Times n ->
-    let converted = case mg of
-          Just (Gauge (Measure cmRows _) _) ->
-            let rowsPerCm = fromIntegral cmRows :: Double
-                equivalentCm = fromIntegral n / rowsPerCm
-            in " (" ++ show (round equivalentCm) ++ " cm)"
-          _ -> ""
-    in show n ++ " veces" ++ converted
-
-  Centimeters c ->
-    let converted = case mg of
-          Just (Gauge (Measure cmRows _) _) ->
-            let rowsPerCm = fromIntegral cmRows :: Double
-                equivalentRows =  c * rowsPerCm
-            in " (" ++ show (round equivalentRows) ++ " filas)"
-          _ -> ""
-    in show c ++ " cm" ++ converted
