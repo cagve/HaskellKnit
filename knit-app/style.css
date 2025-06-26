@@ -284,16 +284,16 @@ main h2 {
 	padding-left: 1.5em;
 }
 
-.pattern-content ul li::before {
-	content: "Row " counter(row) ": ";
-	counter-increment: row;
-	font-weight:800;
-	/* display: inline-block; */
-	margin-left: -1.5em;
-	/* width: 1.5em; */
-	color: var(--color-yarn-deep-plum);
-}
-
+/* .pattern-content ul li::before { */
+/* 	content: "Row " counter(row) ": "; */
+/* 	counter-increment: row; */
+/* 	font-weight:800; */
+/* 	/* display: inline-block; */ */
+/* 	margin-left: -1.5em; */
+/* 	/* width: 1.5em; */ */
+/* 	color: var(--color-yarn-deep-plum); */
+/* } */
+/**/
 
 .pattern-content ol {
 	padding-left: 1.8em;

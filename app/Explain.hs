@@ -3,7 +3,7 @@ module Explain where
 
 import Parser
 import Data.Char (intToDigit)
-import Data.List (group)
+import Data.List (group, intercalate)
 import Data.Maybe (mapMaybe)
 
 -- | Agrupación de un stitch con su cantidad consecutiva
@@ -38,8 +38,8 @@ explainClusterRow :: Int -> [Stitch] -> String
 explainClusterRow _n row = concat (explainCluster (cluster row))
 
 -- | Explica un patrón completo de filas de stitches
-explainClusterPattern :: [[Stitch]] -> String
-explainClusterPattern = unlines . zipWith explainClusterRow [1..]
+explainClusterPattern :: [[Stitch]] -> [String]
+explainClusterPattern = zipWith explainClusterRow [1..]
 
 -- === Explicación de expresiones ===
 
@@ -50,6 +50,10 @@ explainStitch = stitchToStr
 -- | Explica una expresión en formato lista de líneas para mejor legibilidad
 explainExpr :: Expr -> [String]
 explainExpr expr = case expr of
+  RepeatBlock n pat ->
+    let innerLines = concatMap explainExprRow pat
+        header = "Work following for " ++ show n ++ " row" ++ (if n > 1 then "s" else "") ++ ":"
+    in header : innerLines
   Repeat 1 (firstExpr : tailExprs)
     | isWT firstExpr ->
         let tailSize = length tailExprs
@@ -62,22 +66,28 @@ explainExpr expr = case expr of
     K -> ["K1"]
     P -> ["P1"]
     _ -> [explainStitch st ++ "."]
-  Repeat n exprList ->
-    let inner = concatWithComma (map (concat . explainExpr) exprList)
-        wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
-    in ["Repeat " ++ show n ++ " times: " ++ wrapped ++ "."]
-  RepeatNeg n exprList ->
-    let inner = concatWithComma (map (concat . explainExpr) exprList)
-        wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
-    in ["Repeat " ++ wrapped ++ " until " ++ show n ++ " stitch" ++ (if n > 1 then "es" else "") ++ " remain."]
   Zero exprList ->
     let inner = concatWithComma (map (concat . explainExpr) exprList)
         wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
     in ["Repeat " ++ wrapped ++ " until the end of the row."]
-  RepeatBlock n pat ->
-    let innerLines = concatMap explainExprRow pat
-        header = "Work following for " ++ show n ++ " row" ++ (if n > 1 then "s" else "") ++ ":"
-    in header : innerLines
+  Repeat n exprList -> case exprList of
+      [Single st] -> case st of
+        K -> ["K" ++ show n]
+        P -> ["P" ++ show n]
+        _ -> [explainStitch st ++ " " ++ show n ++ "."]
+      _ ->
+        let inner = concatWithComma (map (concat . explainExpr) exprList)
+            wrapped = "*" ++ inner ++ "*"
+        in ["Repeat " ++ show n ++ " times: " ++ wrapped ++ "."]
+  RepeatNeg n exprList -> case exprList of 
+      [Single st] -> case st of
+        K -> ["K" ++ show n]
+        P -> ["P" ++ show n]
+        _ -> [explainStitch st ++ " " ++ show n ++ "."]
+      _ ->
+        let inner = concatWithComma (map (concat . explainExpr) exprList)
+            wrapped = "*" ++ inner ++ "*"
+        in ["Repeat " ++ show n ++ " times: " ++ wrapped ++ "."]
   _ ->
     ["(pattern element not recognized)."]
 
@@ -97,9 +107,35 @@ explainClusterExprRow _n row = concat (explainClusterExpr (clusterExpr row))
 explainExprRow :: [Expr] -> [String]
 explainExprRow = concatMap explainExpr
 
-explainExprPattern :: Pattern -> String
-explainExprPattern pat = unlines $ zipWith explainRow [1..] pat
+explainExprPattern :: Pattern -> [String]
+explainExprPattern = go 1
   where
-    explainRow :: Int -> [Expr] -> String
-    explainRow _n row = concat (explainClusterExpr (clusterExpr row))
+    go :: Int -> [[Expr]] -> [String]
+    go _ [] = []
+    go rowNum (exprs:rest) =
+      case exprs of
+        [RepeatBlock n pat] ->
+          let blockRows = concatMap explainExprRow pat
+              totalRows = length pat * n
+              startRow = rowNum
+              endRow = rowNum + totalRows - 1
+              summary = "Row " ++ show startRow ++ "-" ++ show endRow ++
+                        " (Repite " ++ show n ++ "): " ++ summarizeBlock blockRows
+          in summary : go (rowNum + totalRows) rest
+        _ ->
+          let explanation = intercalate " · " (concatMap explainExpr exprs)
+          -- let explanation = unwords (concatMap explainExpr exprs)
+              line = "Row " ++ show rowNum ++ ": " ++ explanation
+          in line : go (rowNum + 1) rest
 
+-- Esta función toma todas las líneas del bloque y genera un resumen (puedes ajustarla a gusto)
+summarizeBlock :: [String] -> String
+summarizeBlock linesInBlock =
+  if allEqual linesInBlock
+    then head linesInBlock
+    else intercalate " / " linesInBlock
+
+-- Utilidad para ver si todos los elementos son iguales
+allEqual :: Eq a => [a] -> Bool
+allEqual [] = True
+allEqual (x:xs) = all (== x) xs

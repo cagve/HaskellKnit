@@ -74,8 +74,8 @@ instance ToJSON DeleteResponse
 
 data PatternResponse = PatternResponse
   { patternSuccess :: Bool
-  , explanationExprMsg :: Maybe Text
-  , explanationClusterMsg :: Maybe Text
+  , explanationExprMsg :: Maybe [Text]
+  , explanationClusterMsg :: Maybe [Text]
   , gauge :: Maybe Gauge
   , pattern :: Maybe [[Text]]
   , patternErrMsg :: Maybe Text
@@ -96,8 +96,8 @@ errorResponse errMsg = PatternResponse
   }
 
 successResponse
-  :: Maybe Text          -- explanationExprMsg
-  -> Maybe Text          -- explanationClusterMsg
+  :: Maybe [Text]          -- explanationExprMsg
+  -> Maybe [Text]          -- explanationClusterMsg
   -> Maybe Gauge         -- gauge
   -> Maybe [[Text]]      -- pattern
   -> Bool                -- colorPattern
@@ -216,8 +216,8 @@ patternHandler filename = do
                   colorBool          = isColorPattern evaluated
                   gaugeData          = gauge
               return $ successResponse
-                (Just $ T.pack explanationExpr)
-                (Just $ T.pack explanationCluster)
+                (Just $ map T.pack explanationExpr)
+                (Just $ map T.pack explanationCluster)
                 gaugeData
                 (Just patternEvaluated)
                 colorBool

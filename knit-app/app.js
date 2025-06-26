@@ -97,7 +97,7 @@ function updatePattern(pattern){
 		.then(res => res.json())
 		.then(data=>{
 			console.log(data.gauge)
-			let linesCluster = data.explanationClusterMsg.split('\n')
+			let linesCluster = data.explanationClusterMsg
 			titleDOM.innerHTML = "Pattern: " + pattern
 			titleDOM.setAttribute("name", pattern)
 			linesCluster.forEach((line, idx) => {
@@ -113,7 +113,7 @@ function updatePattern(pattern){
 				li.textContent = line
 			})
 
-			let linesExpr = data.explanationExprMsg.split('\n')
+			let linesExpr = data.explanationExprMsg
 			linesExpr.forEach((line, idx) => {
 				if (!line){
 					return
