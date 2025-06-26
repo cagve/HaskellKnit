@@ -1,14 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Parser where
-import Debug.Trace (trace, traceShow)
+import GHC.Generics (Generic)
+import Data.Aeson (FromJSON, ToJSON, eitherDecode)
+import Debug.Trace ( trace, traceShow, trace )
 import Control.Monad (replicateM_, void, when)
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State (StateT, evalStateT)
 import Data.Char ( intToDigit, isSpace )
-import Debug.Trace (trace)
+import Data.List
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import qualified Data.Map as M
@@ -20,23 +23,34 @@ debug :: String -> a -> a
 debug _ x = x
 
 
-
-
-parsePatternFile :: FilePath -> IO (Either ParseError Pattern)
 parsePatternFile filePath = do
   content <- readFile filePath
-  let nonBlankLines = filter (not . all isSpace) (lines content)
-      inputWithSpaces = concat nonBlankLines
-      input = filter (not . isSpace) inputWithSpaces -- quita espacios, tabs, etc
-  return $ parsePattern input
+  return $ parseFile content
+
+parseFile :: String -> Either ParseError (Maybe Gauge, Pattern)
+parseFile content = do
+  let ls = lines content
+      (gaugeLines, patternLines) = partition (isPrefixOf "gauge") ls
+      gaugeStr = unlines gaugeLines
+      patternStr = unlines patternLines
+  mgauge <- case gaugeLines of
+    [] -> Right Nothing
+    _  -> Just <$> parseGauge gaugeStr
+  pat <- parsePattern patternStr
+  return (mgauge, pat)
 
 
-data Measure  = Measure Int Int deriving (Show, Eq, Ord)
-data StitchTension = StitchTension Int Int deriving (Show, Eq, Ord)
+data Measure  = Measure Int Int deriving (Generic, Show, Eq, Ord)
+instance ToJSON Measure
+
+data StitchTension = StitchTension Int Int deriving (Generic, Show, Eq, Ord)
+instance ToJSON StitchTension
+
 data Gauge = Gauge
-  { measureGauge :: Measure  
-  , stitchGauge :: StitchTension  
-  } deriving (Show, Eq)
+  { measureGauge :: Measure
+  , stitchGauge :: StitchTension
+  } deriving (Generic, Show, Eq)
+instance ToJSON Gauge
 
 data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord)
 
@@ -50,6 +64,30 @@ data Expr
 
 type Row = [Expr]
 type Pattern = [Row]
+
+comment :: Parser ()
+comment = try $ do
+  _ <- string "//"
+  _ <- manyTill anyChar newline
+  return ()
+
+parseGauge :: String -> Either ParseError Gauge
+parseGauge = parse gaugeParser ""
+  where
+    gaugeParser = do
+      _ <- string "gauge"
+      _ <- char '('
+      cols <- number
+      _ <- char ','
+      rows <- number
+      _ <- char ')'
+      return $ Gauge (Measure 10 10) (StitchTension cols rows)
+
+
+skipSpaceOrComment :: Parser ()
+skipSpaceOrComment = skipMany (space *> pure () <|> comment <|> newline *> pure ())
+
+
 
 -- Parser
 ktogParser :: Parser Expr
@@ -106,7 +144,7 @@ repeatNegExpr = do
   void $ char '-'
   n <- number
   void $ char '('
-  exprs <- many expr
+  exprs <- sepEndBy expr skipSpaceOrComment
   void $ char ')'
   return $ RepeatNeg n exprs
 
@@ -114,7 +152,7 @@ repeatExpr :: Parser Expr
 repeatExpr = do
   n <- number
   void $ char '('
-  exprs <- many expr
+  exprs <- sepEndBy expr skipSpaceOrComment
   void $ char ')'
   return $ Repeat n exprs
 
@@ -122,7 +160,7 @@ zeroExpr :: Parser Expr
 zeroExpr = do
   void $ char '0'
   void $ char '('
-  exprs <- many expr
+  exprs <- sepEndBy expr skipSpaceOrComment
   void $ char ')'
   return $ Zero exprs
 
@@ -135,7 +173,7 @@ repeatBlockParser = try $ do
   n <- number
   void $ char ')'
   void $ char '{'
-  expr <- patternParser
+  expr <- repeatBlockParserExpr
   void $ char '}'
   return $ RepeatBlock n expr
 
@@ -145,9 +183,9 @@ expr = try repeatBlockParser <|> try zeroExpr <|> try repeatExpr <|> try repeatN
 
 row :: Parser Row
 row = try (do
-            rb <- repeatBlockParser
-            return [rb])
-     <|> many1 expr
+      rb <- repeatBlockParser
+      return [rb])
+  <|> sepEndBy1 expr skipSpaceOrComment
 
 isWT :: Expr -> Bool
 isWT (Single WT) = True
@@ -166,12 +204,24 @@ isColorPattern pattern  = do
   let flat = concat pattern
   all isColor flat
 
-
 patternParser :: Parser Pattern
-patternParser = row `sepEndBy1` char ';'
+patternParser = do
+  skipSpaceOrComment
+  rows <- row `sepEndBy1` (char ';' >> skipSpaceOrComment)
+  skipSpaceOrComment
+  eof
+  return rows
+
+repeatBlockParserExpr :: Parser Pattern
+repeatBlockParserExpr = do
+  skipSpaceOrComment
+  rows <- row `sepEndBy1` (char ';' >> skipSpaceOrComment)
+  skipSpaceOrComment
+  return rows
 
 parsePattern :: String -> Either ParseError Pattern
-parsePattern = parse (patternParser <* eof) ""
+parsePattern = parse patternParser ""
+
 
 parsePatternString :: String -> Either ParseError Pattern
 parsePatternString str =
@@ -337,12 +387,13 @@ convertPattern = map (map (T.pack . stitchToStr))
 
 -- | Calcula el tamaño para el patron evaluado.
 calculateRowSize :: Int -> Gauge -> [[Stitch]] -> Measure
-calculateRowSize row (Gauge (Measure w h) (StitchTension s1 s2)) evaluated = Measure w1 h2 
-  where 
+calculateRowSize row (Gauge (Measure w h) (StitchTension s1 s2)) evaluated = Measure w1 h2
+  where
     stsInRow = countStsInRow (evaluated !! row)
     w1 = (w * stsInRow) `div` s1
     h2 = (h * row+1) `div` s2
 
-  
+
+
 
 

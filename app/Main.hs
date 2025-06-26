@@ -76,11 +76,11 @@ data PatternResponse = PatternResponse
   { patternSuccess :: Bool
   , explanationExprMsg :: Maybe Text
   , explanationClusterMsg :: Maybe Text
+  , gauge :: Maybe Gauge
   , pattern :: Maybe [[Text]]
   , patternErrMsg :: Maybe Text
   , colorPattern :: Bool
   } deriving (Generic, Show)
-
 instance ToJSON PatternResponse
 
 -- Helpers para construir la respuesta
@@ -89,21 +89,28 @@ errorResponse errMsg = PatternResponse
   { patternSuccess = False
   , explanationExprMsg = Nothing
   , explanationClusterMsg = Nothing
+  , gauge = Nothing
   , pattern = Nothing
   , patternErrMsg = Just errMsg
   , colorPattern  = False
   }
 
-successResponse :: Maybe Text -> Maybe Text -> Maybe [[Text]] -> Bool -> PatternResponse
-successResponse exprMsg clusterMsg pat color = PatternResponse
+successResponse
+  :: Maybe Text          -- explanationExprMsg
+  -> Maybe Text          -- explanationClusterMsg
+  -> Maybe Gauge         -- gauge
+  -> Maybe [[Text]]      -- pattern
+  -> Bool                -- colorPattern
+  -> PatternResponse
+successResponse exprMsg clusterMsg gauge pat color = PatternResponse
   { patternSuccess = True
   , explanationExprMsg = exprMsg
   , explanationClusterMsg = clusterMsg
+  , gauge = gauge
   , pattern = pat
   , patternErrMsg = Nothing
   , colorPattern = color
   }
-
 
 -- Define la API
 type API =
@@ -121,7 +128,8 @@ imageHandler req = do
   let fileName   = T.unpack (patternStr req)
       imgPath    = "img/" ++ fileName ++ ".png"
       imgBase64     = T.pack imgPath
-  maybeResult <- liftIO $ processFile (T.unpack $ patternStr req)
+
+  (mgauge, maybeResult) <- liftIO $ processFile fileName
   case maybeResult of
     Nothing -> return ImageResponse
       { imageSuccess = False
@@ -193,42 +201,43 @@ patternHandler filename = do
   let filePath = uploadDir </> filename
   exists <- liftIO $ doesFileExist filePath
   if not exists
-    then
-      return $ errorResponse "Archivo no encontrado"
+    then return $ errorResponse "Archivo no encontrado"
     else do
-      parsed <- liftIO $ parsePatternFile filePath
-      case parsed of
+      result <- liftIO $ parsePatternFile filePath
+      case result of
         Left err -> return $ errorResponse (T.pack $ show err)
-        Right pattern ->
+        Right (gauge, pattern) ->
           case runEval 40 pattern of
             Left err -> return $ errorResponse (T.pack $ show err)
             Right evaluated -> do
-              let patternEvaluated = convertPattern evaluated
-                  explanationExpr = explainExprPattern pattern
+              let patternEvaluated   = convertPattern evaluated
+                  explanationExpr    = explainExprPattern pattern
                   explanationCluster = explainClusterPattern evaluated
-                  colorBool = isColorPattern evaluated
+                  colorBool          = isColorPattern evaluated
+                  gaugeData          = gauge
               return $ successResponse
                 (Just $ T.pack explanationExpr)
                 (Just $ T.pack explanationCluster)
+                gaugeData
                 (Just patternEvaluated)
                 colorBool
 
-processFile :: String -> IO (Maybe (Pattern, [[Stitch]]))
+
+processFile :: String -> IO (Maybe Gauge, Maybe (Pattern, [[Stitch]]))
 processFile filename = do
   let filePath = uploadDir </> filename
-  exists <- liftIO $ doesFileExist filePath
+  exists <- doesFileExist filePath
   if not exists
-    then
-      return $ Nothing 
+    then return (Nothing, Nothing)
     else do
-      parsed <- liftIO $ parsePatternFile filePath
-      case parsed of
-        Left err -> return $ Nothing
-        Right pattern ->
+      result <- parsePatternFile filePath
+      case result of
+        Left _ -> return (Nothing, Nothing)
+        Right (mgauge, pattern) ->
           case runEval 40 pattern of
-            Left err -> return $ Nothing
-            Right evaluated -> do
-              return $ Just (pattern, evaluated)
+            Left _ -> return (mgauge, Nothing)
+            Right evaluated -> return (mgauge, Just (pattern, evaluated))
+
 
 
 -- Aplicación WAI
@@ -236,22 +245,22 @@ app :: Application
 app = serve (Proxy :: Proxy API) server
 main :: IO ()
 main = do
-  -- let corsPolicy = simpleCorsResourcePolicy
-  --       { corsOrigins = Nothing
-  --       , corsMethods = ["GET", "POST", "DELETE", "OPTIONS"]
-  --       , corsRequestHeaders = ["Content-Type", "Authorization"]
-  --       }
-  --     corsMiddleware = cors (const $ Just corsPolicy)
-  --     staticMiddleware = staticPolicy (addBase "img")  -- aquí sirve archivos desde /img
-  --
-  -- putStrLn "Servidor ejecutándose en http://localhost:8080"
-  -- run 8080 $ corsMiddleware $ staticMiddleware app
-  test
+  let corsPolicy = simpleCorsResourcePolicy
+        { corsOrigins = Nothing
+        , corsMethods = ["GET", "POST", "DELETE", "OPTIONS"]
+        , corsRequestHeaders = ["Content-Type", "Authorization"]
+        }
+      corsMiddleware = cors (const $ Just corsPolicy)
+      staticMiddleware = staticPolicy (addBase "img")  -- aquí sirve archivos desde /img
+
+  putStrLn "Servidor ejecutándose en http://localhost:8080"
+  run 8080 $ corsMiddleware $ staticMiddleware app
+  -- test
 
 test :: IO()
 test = do 
   let filename = "patterns/test.knit" -- archivo por defecto si no hay args
-      gauge  = Gauge (Measure 10 10) (StitchTension 5 5)
+      gauge  = Gauge (Measure 10 10) (StitchTension 26 40)
   putStrLn $ " Usando archivo: "   ++ filename
   result <- parsePatternFile filename
   case result of
@@ -260,12 +269,11 @@ test = do
       putStrLn "\nAST: "
       putStrLn $ show pattern
       putStrLn ""
-      case runEval 40 pattern of
-        Left err -> putStrLn $ " Error in pattern.:  " ++ err
-        Right evaluated -> do
-          putStrLn "\nPatrón: "
-          putStrLn $ dshow evaluated
-          putStrLn $ pshow evaluated
-          putStrLn $ show (calculateRowSize 1 gauge evaluated)
+      -- case runEval 40 pattern of
+      --   Left err -> putStrLn $ " Error in pattern.:  " ++ err
+      --   Right evaluated -> do
+      --     putStrLn "\nPatrón: "
+      --     putStrLn $ dshow evaluated
+      --     putStrLn $ show (calculateRowSize 72 gauge evaluated)
 
 

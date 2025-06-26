@@ -96,6 +96,7 @@ function updatePattern(pattern){
 	fetch(API_URL_PATTERNS+"/"+pattern)
 		.then(res => res.json())
 		.then(data=>{
+			console.log(data.gauge)
 			let linesCluster = data.explanationClusterMsg.split('\n')
 			titleDOM.innerHTML = "Pattern: " + pattern
 			titleDOM.setAttribute("name", pattern)
@@ -147,9 +148,6 @@ fileInput.onchange = function() {
     }
     uploadFile(file);
 };
-
-
-
 
 
 
