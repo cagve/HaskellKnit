@@ -1,78 +1,83 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Parser where
-import GHC.Generics (Generic)
-import Data.Aeson (FromJSON, ToJSON, eitherDecode)
-import Debug.Trace ( trace, traceShow, trace )
 import Control.Monad (replicateM_, void, when)
 import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State (StateT, evalStateT)
-import Data.Char ( intToDigit, isSpace )
+import Data.Aeson (FromJSON, ToJSON, eitherDecode)
+import Data.Char (intToDigit, isSpace)
 import Data.List
-import Text.Parsec
-import Text.Parsec.String (Parser)
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
+import Debug.Trace (trace, traceShow)
+import GHC.Generics (Generic)
+import Text.Parsec
+import Text.Parsec.String (Parser)
 
+-- | DATA TYPES
 
-debug :: String -> a -> a
-debug _ x = x
+data Pattern = Pattern
+  { patTitle :: String,
+    patGauge :: Maybe Gauge,
+    patInstructions :: [Row]
+  } deriving (Generic, Show, Eq)
 
-
-parsePatternFile filePath = do
-  content <- readFile filePath
-  return $ parseFile content
-
-parseFile :: String -> Either ParseError (Maybe Gauge, Pattern)
-parseFile content = do
-  let ls = lines content
-      (gaugeLines, patternLines) = partition (isPrefixOf "gauge") ls
-      gaugeStr = unlines gaugeLines
-      patternStr = unlines patternLines
-  mgauge <- case gaugeLines of
-    [] -> Right Nothing
-    _  -> Just <$> parseGauge gaugeStr
-  pat <- parsePattern patternStr
-  return (mgauge, pat)
-
-
-data Measure  = Measure Int Int deriving (Generic, Show, Eq, Ord)
+data Measure = Measure Int Int deriving (Generic, Show, Eq, Ord)
 instance ToJSON Measure
 
 data StitchTension = StitchTension Int Int deriving (Generic, Show, Eq, Ord)
 instance ToJSON StitchTension
 
 data Gauge = Gauge
-  { measureGauge :: Measure
-  , stitchGauge :: StitchTension
-  } deriving (Generic, Show, Eq)
+  { measureGauge :: Measure,
+    stitchGauge :: StitchTension
+  }
+  deriving (Generic, Show, Eq)
 instance ToJSON Gauge
 
-data Stitch = CO | K | P | YO | SSK |S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord)
+data RepeatAmount
+  = Times Int
+  | Centimeters Double
+  deriving (Show, Eq)
+
+data Stitch = CO | K | P | YO | SSK | S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord)
 
 data Expr
   = Single Stitch
   | Repeat Int [Expr]
   | RepeatNeg Int [Expr]
-  | RepeatBlock Int Pattern
+  | RepeatBlock RepeatAmount [Row]
   | Zero [Expr]
   deriving (Show, Eq)
 
 type Row = [Expr]
-type Pattern = [Row]
 
+-- | Parsing expresions
 comment :: Parser ()
 comment = try $ do
   _ <- string "//"
   _ <- manyTill anyChar newline
   return ()
 
-parseGauge :: String -> Either ParseError Gauge
-parseGauge = parse gaugeParser ""
+repeatAmount :: Parser RepeatAmount
+repeatAmount = try cmParser <|> timesParser
+  where
+    -- repeat(cm(12.5)) => Centimeters 12.5
+    cmParser = do
+      string "cm"
+      char '('
+      amt <- float
+      char ')'
+      return $ Centimeters amt
+    -- repeat(10) => Times 10
+    timesParser = Times <$> number
+
+gaugeParser :: String -> Either ParseError Gauge
+gaugeParser = parse gaugeParser ""
   where
     gaugeParser = do
       _ <- string "gauge"
@@ -83,38 +88,38 @@ parseGauge = parse gaugeParser ""
       _ <- char ')'
       return $ Gauge (Measure 10 10) (StitchTension cols rows)
 
-
-skipSpaceOrComment :: Parser ()
-skipSpaceOrComment = skipMany (space *> pure () <|> comment <|> newline *> pure ())
-
-
-
--- Parser
 ktogParser :: Parser Expr
 ktogParser = try $ do
   _ <- char 'k'
-  n <- many1 digit
+  n <- number
   _ <- string "tog"
-  return (Single (KTOG (read n)))
-
+  return (Single (KTOG n))
 
 wtParser :: Parser Expr
 wtParser = try $ do
   _ <- string "wt"
   void $ char '('
-  nStr <- many1 digit
+  n <- number
   void $ char ')'
-  let n = read nStr
   return $ Repeat 1 (Single WT : replicate n (Single O))
 
 number :: Parser Int
 number = read <$> many1 digit
 
+
+-- Float parser
+float :: Parser Double
+float = do
+  whole <- many1 digit
+  char '.'
+  frac <- many1 digit
+  return $ read (whole ++ "." ++ frac)
+
 colorParser :: Parser Expr
 colorParser = try $ do
   _ <- char 'x'
-  n <- many1 digit
-  return (Single (C (read n)))
+  n <- number
+  return $ Single (C n)
 
 castonParser :: Parser Expr
 castonParser = try $ do
@@ -124,9 +129,9 @@ castonParser = try $ do
   void $ char ')'
   return $ Repeat 1 (replicate n (Single CO))
 
-stitch :: Parser Expr
-stitch =
-    try castonParser
+stitchExpr :: Parser Expr
+stitchExpr =
+  try castonParser
     <|> try colorParser
     <|> try (char 'k' >> return (Single K))
     <|> try (char 'p' >> return (Single P))
@@ -137,7 +142,6 @@ stitch =
     <|> try (string "s2kp2" >> return (Single S2KP2))
     <|> try (string "ssk" >> return (Single SSK))
     <|> try (string "yo" >> return (Single YO))
-
 
 repeatNegExpr :: Parser Expr
 repeatNegExpr = do
@@ -164,185 +168,88 @@ zeroExpr = do
   void $ char ')'
   return $ Zero exprs
 
-
 -- NUEVO PARSER: RepeatBlock repeat()
-repeatBlockParser :: Parser Expr
-repeatBlockParser = try $ do
-  void $ string "repeat"
-  void $ char '('
-  n <- number
-  void $ char ')'
-  void $ char '{'
+repeatBlockExpr :: Parser Expr
+repeatBlockExpr = try $ do
+  string "repeat"
+  char '('
+  amt <- repeatAmount
+  char ')'
+  char '{'
   expr <- repeatBlockParserExpr
-  void $ char '}'
-  return $ RepeatBlock n expr
+  char '}'
+  return $ RepeatBlock amt expr
 
 
-expr :: Parser Expr
-expr = try repeatBlockParser <|> try zeroExpr <|> try repeatExpr <|> try repeatNegExpr <|> stitch
-
-row :: Parser Row
-row = try (do
-      rb <- repeatBlockParser
-      return [rb])
-  <|> sepEndBy1 expr skipSpaceOrComment
-
-isWT :: Expr -> Bool
-isWT (Single WT) = True
-isWT _           = False
-
-isCO :: Expr -> Bool
-isCO (Single CO) = True
-isCO _           = False
-
-isColor :: Stitch -> Bool
-isColor (C n) = True
-isColor _     = False
-
-isColorPattern :: [[Stitch]] -> Bool
-isColorPattern pattern  = do
-  let flat = concat pattern
-  all isColor flat
-
-patternParser :: Parser Pattern
-patternParser = do
-  skipSpaceOrComment
-  rows <- row `sepEndBy1` (char ';' >> skipSpaceOrComment)
-  skipSpaceOrComment
-  eof
-  return rows
-
-repeatBlockParserExpr :: Parser Pattern
+repeatBlockParserExpr :: Parser [Row]
 repeatBlockParserExpr = do
   skipSpaceOrComment
   rows <- row `sepEndBy1` (char ';' >> skipSpaceOrComment)
   skipSpaceOrComment
   return rows
 
-parsePattern :: String -> Either ParseError Pattern
-parsePattern = parse patternParser ""
+expr :: Parser Expr
+expr = try repeatBlockExpr <|> try zeroExpr <|> try repeatExpr <|> try repeatNegExpr <|> stitchExpr
 
+row :: Parser Row
+row =
+  try
+    ( do
+        rb <- repeatBlockExpr
+        return [rb]
+    )
+    <|> sepEndBy1 expr skipSpaceOrComment
 
-parsePatternString :: String -> Either ParseError Pattern
-parsePatternString str =
-  let nonBlankLines = filter (not . all isSpace) (lines str)
-      inputWithSpaces = concat nonBlankLines
-      input = filter (not . isSpace) inputWithSpaces  -- Elimina espacios, tabs, etc.
-  in parsePattern input
+instructions :: Parser [Row]
+instructions = do
+  skipSpaceOrComment
+  rows <- row `sepEndBy1` (char ';' >> skipSpaceOrComment)
+  skipSpaceOrComment
+  eof
+  return rows
 
--- Evaluador
+parsePattern :: String -> Either ParseError [Row]
+parsePattern = parse instructions ""
 
-type ExpectedSts = Int
-type RowNumber = Int
-type EvalEnv = (RowNumber, ExpectedSts, Int) -- (total esperado, posición actual)
-type EvalM a = StateT EvalEnv (Except String) a
+parsePatternFile filePath = do
+  content <- readFile filePath
+  return $ parseFile content
 
-evalExprM :: Expr -> EvalM [Stitch]
-evalExprM e = case e of
-  Single s -> do
-    (row, total, pos) <- get
-    let advance = stConsume s
-    put (row, total, pos + advance)
-    return [s]
-  RepeatNeg n exprs -> do
-    (row, total, pos) <- get
-    sts <- concat <$> mapM evalExprM exprs
-    let lenSts = length sts
-    let remaining = total - pos
-    let reps = if lenSts == 0 then 0 else remaining `div` lenSts
-    let repsRemaining = reps - n
-    when (repsRemaining `mod` lenSts /= 0) $
-      throwError $
-        "Error: Row(" ++ show row ++ ") >> Not divisible:  Quedan (" ++ show repsRemaining ++ "sts) y la repitición es de (" ++ show lenSts ++ "sts)."
-    put (row, total, pos + repsRemaining)
-    return $ concat (replicate repsRemaining sts)
-  Repeat n exprs -> do
-    sts <- concat <$> mapM evalExprM exprs
-    let len = length sts
-    replicateM_ (n - 1) $ do
-      (row, total, pos) <- get
-      put (row, total, pos + len)
-      -- traceShow ("[evalRowM@]", row, total, pos) $ return ()
-    return $ concat (replicate n sts)
-  Zero exprs -> do
-    (row, total, pos) <- get
-    let remaining = total - pos
-    sts <- concat <$> mapM evalExprM exprs
-    let lenSts = length sts
-    let reps = if lenSts == 0 then 0 else remaining `div` lenSts
-    put (row, total, pos + reps * lenSts)
-    return $ concat (replicate reps sts)
-  RepeatBlock int pattern ->
-    throwError "RepeatBlock no puede evaluarse como una expresión individual en evalExprM"
-
-
-positionOfWT :: [Stitch] -> Int
-positionOfWT  = go 0
-  where
-    go _ [] = trace "[DEBUG] WT no encontrado" 0
-    go i (s:ss)
-      | s == WT   = i
-      | otherwise = go (i + stConsume s) ss
-      -- | s == WT   = traceShow ("[DEBUG] WT encontrado en posicion logica", i) i
-      -- | otherwise = traceShow ("[DEBUG] Avanzando: stitch =", s) (go (i + stitchAdvance s) ss)
+parseFile :: String -> Either ParseError Pattern
+parseFile content = do
+  let ls = lines content
+      (gaugeLines, patternLines) = partition (isPrefixOf "gauge") ls
+      gaugeStr = unlines gaugeLines
+      patternStr = unlines patternLines
+  mgauge <- case gaugeLines of
+    [] -> Right Nothing
+    _ -> Just <$> gaugeParser gaugeStr
+  pat <- parsePattern patternStr
+  return Pattern {patTitle="DEFAULT", patGauge=mgauge, patInstructions=pat}
 
 
 
-evalRowM :: Row -> EvalM [Stitch]
-evalRowM exprs = concat <$> mapM evalExprM exprs
+-- | AUXILIAR FUNCTIONS
+skipSpaceOrComment :: Parser ()
+skipSpaceOrComment = skipMany (space *> pure () <|> comment <|> newline *> pure ())
 
-evalRepeatBlock :: Int -> Pattern -> EvalM [[Stitch]]
-evalRepeatBlock 0 _ = return []
-evalRepeatBlock n pattern = do
-  result <- evalPatternState pattern
-  rest <- evalRepeatBlock (n - 1) pattern
-  return (result ++ rest)
+isWT :: Expr -> Bool
+isWT (Single WT) = True
+isWT _ = False
 
-evalPatternState :: Pattern -> EvalM [[Stitch]]
-evalPatternState [] = return []
-evalPatternState (r:rs) = do
-  case r of
-    [RepeatBlock n innerPattern] -> do
-      repeatedRows <- evalRepeatBlock n innerPattern
-      restResult <- evalPatternState rs
-      return (repeatedRows ++ restResult)
 
-    _ -> do
-      (row, total, pos) <- get
-      -- | Previous was a WT
-      let newRowSt = if pos == 0 then r else replicate pos (Single O) ++ r
-      when (pos > 0) $ put (row, total, 0)
-      (row, total, pos) <- get
-      firstRow <- evalRowM newRowSt
-      let consumedSts = sum (map stConsume firstRow)
+isCO :: Expr -> Bool
+isCO (Single CO) = True
+isCO _ = False
 
-      when (row > 0 && consumedSts /= total) $
-        throwError $
-          "Error: Row(" ++ show row ++ ") >> Expected sts: (" ++ show total ++
-          ") /= CurrentSts: (" ++ show consumedSts ++ ")"
+isColor :: Stitch -> Bool
+isColor (C n) = True
+isColor _ = False
 
-      -- Calcular nuevos valores para el estado
-      let newExpected = sum (map stWeight firstRow)
-      let wtPos = (if WT `elem` firstRow then positionOfWT firstRow else total)
-      let newPos = total - wtPos
-      put (row + 1, newExpected, newPos)
-      restResult <- evalPatternState rs
-      return (firstRow : restResult)
-
-stWeight:: Stitch -> Int
-stWeight WT = 0
-stWeight _ = 1
-
-stConsume :: Stitch -> Int
-stConsume SSK      = 2
-stConsume S2KP2    = 3
-stConsume YO       = 0
-stConsume WT       = 0
-stConsume M1L      = 0
-stConsume M1R      = 0
-stConsume CO       = 0
-stConsume (KTOG n) = n
-stConsume _        = 1
+isColorPattern :: [[Stitch]] -> Bool
+isColorPattern pattern = do
+  let flat = concat pattern
+  all isColor flat
 
 stitchToLongStr :: Stitch -> String
 stitchToLongStr K = "Knit"
@@ -354,9 +261,9 @@ stitchToLongStr WT = "Wrap and turn"
 stitchToLongStr O = ""
 stitchToLongStr SSK = "Slip Slip Knit"
 stitchToLongStr CO = "Cast on"
-stitchToLongStr S2KP2 = "Slip 2, knit 1 and pass slipped stitch over"
+stitchToLongStr S2KP2 = "Slip 2, knit 1 and pass slipped stitchExpr over"
 stitchToLongStr (KTOG n) = "Knit " ++ [intToDigit n] ++ " together"
-stitchToLongStr (C n) = "Color" ++ [intToDigit (n+1) ]
+stitchToLongStr (C n) = "Color" ++ [intToDigit (n + 1)]
 
 stitchToStr :: Stitch -> String
 stitchToStr K = "K"
@@ -371,29 +278,4 @@ stitchToStr CO = "CO"
 stitchToStr S2KP2 = "S2KP2"
 stitchToStr (KTOG n) = "K" ++ [intToDigit n] ++ "TOG"
 stitchToStr (C n) = "C" ++ [intToDigit n]
-
-
-countStsInRow :: [Stitch] -> Int
-countStsInRow sts = do
-  let n = sum (map stWeight sts)
-  n
-
-runEval :: ExpectedSts -> Pattern -> Either String [[Stitch]]
-runEval total pat = runExcept $ evalStateT (evalPatternState pat) (0, total, 0)
-
-convertPattern :: [[Stitch]] -> [[Text]]
-convertPattern = map (map (T.pack . stitchToStr))
-
-
--- | Calcula el tamaño para el patron evaluado.
-calculateRowSize :: Int -> Gauge -> [[Stitch]] -> Measure
-calculateRowSize row (Gauge (Measure w h) (StitchTension s1 s2)) evaluated = Measure w1 h2
-  where
-    stsInRow = countStsInRow (evaluated !! row)
-    w1 = (w * stsInRow) `div` s1
-    h2 = (h * row+1) `div` s2
-
-
-
-
 
