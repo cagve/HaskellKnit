@@ -3,7 +3,8 @@ gauge(10,10);
 
 k k k k;
 
-repeat(cm(10.0)){
+//repeat(20){
+repeat(cm(40.0)){
   p p p p;
-  k k k k;
+  p p p p;
 }

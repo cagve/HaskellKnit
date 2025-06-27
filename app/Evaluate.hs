@@ -80,24 +80,26 @@ evalRepeatBlock ra pattern = case ra of
           rest <- evalRepeatBlock (Times (n - 1)) pattern
           return (result ++ rest)
   Centimeters cm ->
-      if cm <= 0 
-        then return []
-        else do
+    if cm <= 0
+      then return []
+      else do
         (_, _, _, maybeGauge) <- get
         case maybeGauge of 
-          Nothing -> throwError "Not gauge provided."
-          Just (Gauge (Measure _ measureRowsCm) (StitchTension _ tensionRows)) -> do
-            result <- evalPatternState pattern
-            let oneBlockRows = length result
-                oneBlockCm = if tensionRows == 0
-                               then 0
-                               else fromIntegral oneBlockRows
-                                    / fromIntegral tensionRows
-                                    * fromIntegral measureRowsCm
-            if oneBlockCm <= 0
-              then throwError "No se puede calcular la longitud en cm del bloque."
-              else repeatUntilCm cm oneBlockCm result pattern
+          Nothing -> throwError "Gauge not provided."
+          Just (Gauge (Measure cmRows _) (StitchTension _ tensionRows)) -> do
+            let totalRowsNeeded = round $
+                  cm * (fromIntegral tensionRows / fromIntegral cmRows)
+            buildUntilRows totalRowsNeeded pattern
 
+buildUntilRows :: Int -> [Row] -> EvalM [[Stitch]]
+buildUntilRows n pattern = go 0 []
+  where
+    go total acc
+      | total >= n = return acc
+      | otherwise = do
+          result <- evalPatternState pattern
+          let newTotal = total + length result
+          go newTotal (acc ++ result)
 
 evalPatternState :: [Row] -> EvalM [[Stitch]]
 evalPatternState [] = return []

@@ -274,7 +274,7 @@ test = do
         Left err -> putStrLn $ " Error in pattern.:  " ++ err
         Right evaluated -> do
           putStrLn "\nPatrón: "
-          putStrLn $ show evaluated
+          -- putStrLn $ show evaluated
           putStrLn $ show (explainExprPattern pattern)
       -- --     putStrLn $ show (calculateRowSize 72 gauge evaluated)
       --

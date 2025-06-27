@@ -73,7 +73,6 @@ repeatAmount = try cmParser <|> timesParser
       amt <- float
       char ')'
       return $ Centimeters amt
-    -- repeat(10) => Times 10
     timesParser = Times <$> number
 
 gaugeParser :: String -> Either ParseError Gauge
