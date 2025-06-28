@@ -96,31 +96,32 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
       [RepeatBlock ra pat] ->
         let innerExpl = explainExprRows pat
             explSize  = length innerExpl
+
             numberOfRows = case ra of
-              Times x       -> getRowRepetitionNumber maybeGauge ra * explSize
+              Times x       -> x * explSize
+              Until x       -> x
               Centimeters x ->
                 let repRows = getRowRepetitionNumber maybeGauge ra
                 in round (fromIntegral repRows / fromIntegral explSize) * explSize
 
-            labeledLines = zipWith (\c (Line s) -> c : ": " ++ s) ['A'..] innerExpl
-            header = case ra of
-              Times x ->
-                let cms = getCmRepetitionNumber numberOfRows maybeGauge
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows - 1)
-                    labelRange =
-                      if null innerExpl then ""
-                      else "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] "
-                           ++ show x ++ " times (" ++ show cms ++ "cms)"
-                in rowRange ++ ": " ++ labelRange
-              Centimeters x ->
-                let reps = round (fromIntegral (getRowRepetitionNumber maybeGauge ra) / fromIntegral explSize)
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows - 1)
-                    labelRange =
-                      if null innerExpl then ""
-                      else "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] "
-                           ++ show reps ++ " times (" ++ show x ++ "cms)"
-                in rowRange ++ ": " ++ labelRange
+            reps = case ra of 
+              Times x       -> x 
+              Until x       -> round (fromIntegral numberOfRows / fromIntegral explSize)
+              Centimeters x -> round (fromIntegral (getRowRepetitionNumber maybeGauge ra) / fromIntegral explSize)
 
+            cms = case ra of 
+              Times x       -> getCmRepetitionNumber numberOfRows maybeGauge
+              Until x       -> getCmRepetitionNumber numberOfRows maybeGauge
+              Centimeters x -> round x
+
+            rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows - 1)
+            labeledLines = zipWith (\c (Line s) -> c : ": " ++ s) ['A'..] innerExpl
+            labelRange =
+              if null innerExpl then ""
+              else "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] "
+                   ++ show reps ++ " times (" ++ show numberOfRows ++ ") (" ++ show cms ++ "cms)"
+
+            header = rowRange ++ ": " ++ labelRange
             blockExplanation = Block (header : labeledLines)
         in blockExplanation : go (n + numberOfRows) exprs
 
@@ -180,6 +181,7 @@ allEqual (x:xs) = all (== x) xs
 getRowRepetitionNumber :: Maybe Gauge -> RepeatAmount -> Int
 getRowRepetitionNumber mg ra = case ra of
   Times n -> n
+  Until n -> n
   Centimeters c -> case mg of
           Just (Gauge (Measure cmWidth cmHeight) (StitchTension stWidth stHeight)) ->
               let stHeight' = fromIntegral stHeight :: Double

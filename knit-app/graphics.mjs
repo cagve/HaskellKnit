@@ -1,18 +1,33 @@
 const CELL_SIZE = 40;
 
-function drawDebugCanvas(pattern) {
+let currentPattern = null
+let currentRow = null
+
+export function setPattern(pattern){
+	currentPattern = pattern
+}
+
+export function setCurrentRow(row) {
+	currentRow = row;
+}
+
+function drawDebugCanvas() {
 	const colors = getColors();
 	const canvas = document.getElementById("patternCanvas");
 	const ctx = canvas.getContext("2d");
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	const compressedPattern = compressPattern(pattern);
+	const compressedPattern = compressPattern();
 	resizeCanvasToCompressedPattern(compressedPattern);
 	drawCompressedPattern(ctx, compressedPattern, colors);
+	if (currentRow !== null) {
+		ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // amarillo translúcido tipo resaltador
+		ctx.fillRect(0, currentRow * CELL_SIZE, canvas.width, CELL_SIZE);
+	}
 }
 
-function compressPattern(pattern) {
-	return pattern.map(row => {
+function compressPattern() {
+	return currentPattern.map(row => {
 		const compressedRow = [];
 		let currentColor = row[0][1];
 		let count = 1;
@@ -57,15 +72,17 @@ function drawCompressedPattern(ctx, compressedPattern, colors) {
 	});
 }
 
-function drawCanvas(pattern) {
+function drawCanvas() {
 	const colors = getColors();
 	const canvas = document.getElementById("patternCanvas");
 	const ctx = canvas.getContext("2d");
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	resizeCanvasToPattern(pattern);
+	resizeCanvasToPattern();
 
-	const matrix = pattern.map(row => row.map(cell => parseInt(cell[1])));
+	console.log(currentPattern)
+	const matrix = currentPattern.map(row => row.map(cell => parseInt(cell[1])));
+	const l = matrix.length
 
 	matrix.forEach((row, i) => {
 		row.forEach((val, j) => {
@@ -74,6 +91,12 @@ function drawCanvas(pattern) {
 			ctx.strokeRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 		});
 	});
+	console.log(l)
+	console.log(currentRow)
+	if (currentRow !== null) {
+		ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // amarillo translúcido tipo resaltador
+		ctx.fillRect(0, (l-1-currentRow) * CELL_SIZE, canvas.width, CELL_SIZE);
+	}
 }
 
 function getColors() {
@@ -99,10 +122,10 @@ function printText(ctx, repetitions, x, y, color) {
 	ctx.fillText(repetitions.toString(), centerX, centerY);
 }
 
-function resizeCanvasToPattern(pattern) {
+function resizeCanvasToPattern() {
 	const canvas = document.getElementById("patternCanvas");
-	const cols = pattern[0].length;
-	const rows = pattern.length;
+	const cols = currentPattern[0].length;
+	const rows = currentPattern.length;
 	canvas.width = cols * CELL_SIZE;
 	canvas.height = rows * CELL_SIZE;
 }
@@ -117,9 +140,9 @@ function resizeCanvasToCompressedPattern(compressedPattern) {
 	canvas.height = rows * CELL_SIZE;
 }
 
-export function drawImg(pattern) {
+export function drawImg() {
 	const checkbox = document.getElementById('debugImg');
-	checkbox.checked ? drawDebugCanvas(pattern) : drawCanvas(pattern);
+	checkbox.checked ? drawDebugCanvas() : drawCanvas();
 }
 
 export function isCanvasBlank() {

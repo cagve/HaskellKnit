@@ -53,6 +53,7 @@ instance ToJSON Gauge
 data RepeatAmount
   = Times Int
   | Centimeters Double
+  | Until Int
   deriving (Generic, Show, Eq, Ord)
 instance ToJSON RepeatAmount
 
@@ -78,7 +79,7 @@ comment = try $ do
   return ()
 
 repeatAmount :: Parser RepeatAmount
-repeatAmount = try cmParser <|> timesParser
+repeatAmount = try cmParser <|> timesParser <|> untilParser
   where
     -- repeat(cm(12.5)) => Centimeters 12.5
     cmParser = do
@@ -88,6 +89,12 @@ repeatAmount = try cmParser <|> timesParser
       char ')'
       return $ Centimeters amt
     timesParser = Times <$> number
+    untilParser = do 
+      string "until"
+      char '('
+      amt <- number
+      char ')'
+      return $ Until amt
 
 gaugeParser :: String -> Either ParseError Gauge
 gaugeParser = parse gaugeParser ""

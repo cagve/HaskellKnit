@@ -8,7 +8,9 @@ k -13(p) wt(13);
 k -4(p) 0(k);
 0(k) co(35) co(30);
 
-repeat(36){
+repeat(until(72)){
+//repeat(36){
+//repeat(cm(18.0)){
   4(k) -4(p) 4(k);
   0(k);
 };

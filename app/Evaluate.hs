@@ -79,6 +79,15 @@ evalRepeatBlock ra pattern = case ra of
           result <- evalPatternState pattern
           rest <- evalRepeatBlock (Times (n - 1)) pattern
           return (result ++ rest)
+  Until n -> do
+    let len = length pattern
+    if len == 0
+      then throwError "Pattern is empty, cannot repeat Until"
+      else if n `mod` len /= 0
+        then throwError $ "Until repeat count " ++ show n ++ " is not divisible by pattern length " ++ show len
+        else do
+          let reps = n `div` len
+          evalRepeatBlock (Times reps) pattern
   Centimeters cm ->
     if cm <= 0
       then return []

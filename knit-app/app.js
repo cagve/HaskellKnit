@@ -1,4 +1,4 @@
-import {drawImg} from './graphics.mjs';
+import {setCurrentRow, drawImg, setPattern} from './graphics.mjs';
 
 const API_URL = "http://127.0.0.1:8080";
 const API_URL_PATTERNS = API_URL+"/patterns";
@@ -90,13 +90,14 @@ function updatePattern(pattern){
 	resetImg();
 
 	currentRow = 0
+	setCurrentRow(currentRow)
 	shortRadio.checked  = "block"
 	clusterInstructions.innerHTML = ''
 	exprInstructions.innerHTML = ''
 	fetch(API_URL_PATTERNS+"/"+pattern)
 		.then(res => res.json())
 		.then(data=>{
-			console.log(data)
+			setPattern(pattern);	
 			let linesCompact = data.patternCompact
 			titleDOM.innerHTML = "Pattern: " + pattern
 			titleDOM.setAttribute("name", pattern)
@@ -107,6 +108,7 @@ function updatePattern(pattern){
 				const li = document.createElement('li')
 				li.addEventListener('click', () => {
 					currentRow = idx;   // actualizar fila seleccionada
+					setCurrentRow(currentRow)
 					updateRow();    
 				});
 				clusterInstructions.appendChild(li)
@@ -146,46 +148,50 @@ fileInput.onchange = function() {
 function updateRow(){
 	let li_elements = ""
 	if (APP_STATE === 2) {
-		return 
-	}else if (APP_STATE === 1) {
-		li_elements = clusterInstructions.querySelectorAll('li');
-	} else {
-		li_elements = exprInstructions.querySelectorAll('li');
-	}
-	rowIndicator.textContent = `Row ${currentRow + 1}`;
-	li_elements.forEach((li, i) => {
-		  li.classList.toggle('highlighted', i === currentRow);
-	});
-
-	// Scroll al elemento seleccionado
-	const selectedLi = li_elements[currentRow];
-	if (selectedLi) {
-		selectedLi.scrollIntoView({
-			behavior: 'smooth',
-			block: 'center'
+		 drawImg()
+	} else{
+		if (APP_STATE === 1) {
+			li_elements = clusterInstructions.querySelectorAll('li');
+		} else {
+			li_elements = exprInstructions.querySelectorAll('li');
+		}
+		li_elements.forEach((li, i) => {
+			li.classList.toggle('highlighted', i === currentRow);
 		});
-	} 
+
+		const selectedLi = li_elements[currentRow];
+		if (selectedLi) {
+			selectedLi.scrollIntoView({
+				behavior: 'smooth',
+				block: 'center'
+			});
+		} 
+	}
+
+	rowIndicator.textContent = `Row ${currentRow + 1}`;
 }
 
 //
-prevBtn.onclick = () => {
-  if (currentRow > 0) {
-    currentRow--;
-    updateRow();
-  }
-};
+	prevBtn.onclick = () => {
+		if (currentRow > 0) {
+			currentRow--;
+			setCurrentRow(currentRow)
+			updateRow();
+		}
+	};
 
 nextBtn.onclick = () => {
 	let li_elements = ''
-	if (APP_STATE === 2) {
-		return 
-	}else if (APP_STATE === 1) {
+	
+	if (APP_STATE === 1) {
 		li_elements = clusterInstructions.querySelectorAll('li');
 	} else {
 		li_elements = exprInstructions.querySelectorAll('li');
 	}
+
 	if (currentRow < li_elements.length - 1) {
 		currentRow++;
+		setCurrentRow(currentRow)
 		updateRow();
 	}
 };
@@ -205,25 +211,23 @@ document.querySelectorAll('input[name="appState"]').forEach(radio => {
 	});
 });
 
-function updateImg(pattern,colors = colorMap){
+function updateImg(pattern, colors = colorMap){
+	setPattern(pattern)
 	document.getElementById("patternCanvas").style.display="block";
 	let divColorPickerBox = document.createElement('div')
 	divColorPickerBox.id = "colorPickerBox"
 	let divNav = document.createElement('div')
-	let butZoomIn = document.createElement('button')
-	let butZoomOut = document.createElement('button')
-	let butZoomReset = document.createElement('button')
 	let debugCheckbox = document.createElement('input')
 	debugCheckbox.id = "debugImg"
 	debugCheckbox.type="checkbox"
-	debugCheckbox.onchange = () => drawImg(pattern)
+	debugCheckbox.onchange = () => drawImg()
 	divNav.id = "imgNav"
 	for (let i = 0; i < colors.length; i++){
 		let inputColor = document.createElement('input')
 		inputColor.type = "color"
 		inputColor.name = "colors"
 		inputColor.id = "color"+1
-		inputColor.onchange = () => drawImg(pattern)
+		inputColor.onchange = () => drawImg()
 		inputColor.value = (i>colors.length) ? '#ffffff' : colors[i];
 		divNav.appendChild(inputColor)
 	}
@@ -233,7 +237,7 @@ function updateImg(pattern,colors = colorMap){
 	// CHECKBOX Tex
 	const text = document.createTextNode(" Magic marker"); 
 	debugCheckbox.parentNode?.insertBefore(text, debugCheckbox.nextSibling);
-	drawImg(pattern)
+	drawImg()
 }
 
 
@@ -283,64 +287,64 @@ function resetImg(){
 }
 
 function createInstructionElements(linesExpr) {
-  const elements = [];
+	const elements = [];
 
-  linesExpr.forEach((item, idx) => {
-    if (!item) return;
+	linesExpr.forEach((item, idx) => {
+		if (!item) return;
 
-    if (item.tag === "Line") {
-      const li = document.createElement('li');
-      li.textContent = item.contents;
-      li.addEventListener('click', () => {
-        currentRow = idx;
-        updateRow();
-      });
-      elements.push(li);
+		if (item.tag === "Line") {
+			const li = document.createElement('li');
+			li.textContent = item.contents;
+			li.addEventListener('click', () => {
+				currentRow = idx;
+				updateRow();
+			});
+			elements.push(li);
 
-    } else if (item.tag === "Block") {
-      const blockContainer = document.createElement('li');
-      blockContainer.style.cursor = 'pointer';
+		} else if (item.tag === "Block") {
+			const blockContainer = document.createElement('li');
+			blockContainer.style.cursor = 'pointer';
 
-      const header = document.createElement('div');
-      header.style.display = 'flex';
-      header.style.justifyContent = 'space-between';
-      header.style.alignItems = 'center';
+			const header = document.createElement('div');
+			header.style.display = 'flex';
+			header.style.justifyContent = 'space-between';
+			header.style.alignItems = 'center';
 
-      const title = document.createElement('span');
-      title.textContent = item.contents[0];
+			const title = document.createElement('span');
+			title.textContent = item.contents[0];
 
-      const toggleIcon = document.createElement('span');
-      toggleIcon.textContent = '▶';
-      toggleIcon.style.marginLeft = '8px';
-      toggleIcon.style.fontSize = '0.9em';
+			const toggleIcon = document.createElement('span');
+			toggleIcon.textContent = '▶';
+			toggleIcon.style.marginLeft = '8px';
+			toggleIcon.style.fontSize = '0.9em';
 
-      header.appendChild(title);
-      header.appendChild(toggleIcon);
-      blockContainer.appendChild(header);
+			header.appendChild(title);
+			header.appendChild(toggleIcon);
+			blockContainer.appendChild(header);
 
-      const subList = document.createElement('ul');
-      subList.style.display = 'none';
-      subList.style.marginTop = '5px';
-      blockContainer.appendChild(subList);
+			const subList = document.createElement('ul');
+			subList.style.display = 'none';
+			subList.style.marginTop = '5px';
+			blockContainer.appendChild(subList);
 
-      item.contents.slice(1).forEach((subItem) => {
-        const subLi = document.createElement('li');
-        subLi.textContent = subItem;
-        subList.appendChild(subLi);
-      });
+			item.contents.slice(1).forEach((subItem) => {
+				const subLi = document.createElement('li');
+				subLi.textContent = subItem;
+				subList.appendChild(subLi);
+			});
 
-      header.addEventListener('click', (e) => {
-        e.stopPropagation(); // evitar conflictos si hay eventos padres
-        const isVisible = subList.style.display === 'block';
-        subList.style.display = isVisible ? 'none' : 'block';
-        toggleIcon.textContent = isVisible ? '▶' : '▼';
-      });
+			header.addEventListener('click', (e) => {
+				e.stopPropagation(); // evitar conflictos si hay eventos padres
+				const isVisible = subList.style.display === 'block';
+				subList.style.display = isVisible ? 'none' : 'block';
+				toggleIcon.textContent = isVisible ? '▶' : '▼';
+			});
 
-      elements.push(blockContainer);
-    }
-  });
+			elements.push(blockContainer);
+		}
+	});
 
-  return elements;
+	return elements;
 }
 
 
