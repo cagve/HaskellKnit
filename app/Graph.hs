@@ -16,7 +16,9 @@ import GHC.Generics (Generic)
 import Data.Aeson (FromJSON, ToJSON)
 import Parser
 import Explain
-import Print
+
+reverseList  [] = []
+reverseList  xs = last xs : reverseList (init xs)
 
 data RGB = RGB
   { r :: Int,
@@ -79,7 +81,6 @@ combineVertical img1 img2 = generateImage pixelFunc newWidth newHeight
     h2 = imageHeight img2
     newWidth = max w1 w2
     newHeight = h1 + h2
-
     
     -- CENTER
     center = True

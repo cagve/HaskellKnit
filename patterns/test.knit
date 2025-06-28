@@ -1,10 +1,22 @@
 // HOLA MUNDO
 gauge(10,10);
 
-k k k k;
-
-//repeat(20){
-repeat(cm(40.0)){
-  p p p p;
-  p p p p;
-}
+x1 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x1 x0;
+x0 x1 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x0 x1 x0 x0;
+x1 x0 x1 x0 x0 x0 x0 x0 x0 x0 x0 x0 x1 x0 x1 x0;
+x1 x0 x0 x1 x0 x0 x0 x0 x0 x0 x0 x1 x0 x0 x1 x0;
+x1 x0 x0 x1 x0 x0 x0 x0 x0 x0 x0 x1 x0 x0 x1 x0;
+x1 x0 x0 x0 x1 x0 x0 x0 x0 x0 x1 x0 x0 x0 x1 x0;
+x1 x0 x0 x0 x1 x1 x1 x1 x1 x1 x1 x0 x0 x0 x1 x0;
+x1 x1 x1 x1 x1 x0 x1 x0 x1 x0 x1 x1 x1 x1 x1 x0;
+x0 x1 x1 x1 x1 x0 x1 x0 x1 x0 x1 x1 x1 x1 x0 x0;
+x0 x0 x1 x1 x1 x1 x1 x0 x1 x1 x1 x1 x1 x0 x0 x0;
+x0 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x0 x0;
+x0 x1 x1 x1 x0 x0 x1 x1 x1 x0 x0 x1 x1 x1 x0 x0;
+x0 x1 x1 x1 x0 x0 x1 x1 x1 x0 x0 x1 x1 x1 x0 x0;
+x0 x0 x0 x1 x1 x1 x1 x1 x1 x1 x1 x1 x0 x0 x0 x0;
+x0 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x1 x0 x0;
+x0 x0 x1 x1 x1 x1 x0 x0 x0 x1 x1 x1 x1 x0 x0 x0;
+x0 x0 x1 x1 x1 x1 x1 x0 x1 x1 x1 x1 x1 x0 x0 x0;
+x0 x0 x0 x1 x1 x0 x0 x1 x0 x0 x1 x1 x0 x0 x0 x0;
+x0 x0 x0 x0 x0 x1 x1 x1 x1 x1 x0 x0 x0 x0 x0 x0

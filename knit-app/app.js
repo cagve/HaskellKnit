@@ -1,4 +1,4 @@
-import {drawImg, isCanvasBlank, zoomReset, zoomOut, zoomIn} from './graphics.mjs';
+import {drawImg} from './graphics.mjs';
 
 const API_URL = "http://127.0.0.1:8080";
 const API_URL_PATTERNS = API_URL+"/patterns";
@@ -97,10 +97,10 @@ function updatePattern(pattern){
 		.then(res => res.json())
 		.then(data=>{
 			console.log(data.gauge)
-			let linesCluster = data.explanationClusterMsg
+			let linesCompact = data.patternCompact
 			titleDOM.innerHTML = "Pattern: " + pattern
 			titleDOM.setAttribute("name", pattern)
-			linesCluster.forEach((line, idx) => {
+			linesCompact.forEach((line, idx) => {
 				if (!line){
 					return
 				}
@@ -110,10 +110,10 @@ function updatePattern(pattern){
 					updateRow();    
 				});
 				clusterInstructions.appendChild(li)
-				li.textContent = line
+				li.textContent = line.contents
 			})
 
-			let linesExpr = data.explanationExprMsg
+			let linesExpr = data.patternExplanation
 			linesExpr.forEach((line, idx) => {
 				if (!line){
 					return
@@ -124,10 +124,10 @@ function updatePattern(pattern){
 					updateRow();    
 				});
 				exprInstructions.appendChild(li)
-				li.textContent = line
+				li.textContent = line.contents
 			})
 			if (data.colorPattern){
-				updateImg(data.pattern);
+				updateImg(data.patternStruct.instructions);
 			}
 			APP_STATE = 0;
 			updateAppState()
@@ -225,16 +225,7 @@ function updateImg(pattern,colors = colorMap){
 	debugCheckbox.id = "debugImg"
 	debugCheckbox.type="checkbox"
 	debugCheckbox.onchange = () => drawImg(pattern)
-	butZoomReset.textContent = "Reset"
-	butZoomReset.onclick = () => zoomReset(pattern);
-	butZoomIn.textContent = "In"
-	butZoomIn.onclick = () => zoomIn(pattern);
-	butZoomOut.onclick = () => zoomOut(pattern);
-	butZoomOut.textContent= "Out"
 	divNav.id = "imgNav"
-	divNav.appendChild(butZoomIn)
-	divNav.appendChild(butZoomOut)
-	divNav.appendChild(butZoomReset)
 	for (let i = 0; i < colors.length; i++){
 		let inputColor = document.createElement('input')
 		inputColor.type = "color"

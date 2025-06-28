@@ -1,106 +1,90 @@
-const CELL_SIZE = 40
-let cellSize = CELL_SIZE
-// let ZOOM_FACTOR = 1;
+const CELL_SIZE = 40;
 
-function drawDebugCanvas(pattern, scale = 1) {
-    const colors = getColors();
-    const canvas = document.getElementById("patternCanvas");
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const compressedPattern = compressPattern(pattern);
-    drawCompressedPattern(ctx, compressedPattern, colors, scale);
+function drawDebugCanvas(pattern) {
+	const colors = getColors();
+	const canvas = document.getElementById("patternCanvas");
+	const ctx = canvas.getContext("2d");
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	const compressedPattern = compressPattern(pattern);
+	resizeCanvasToCompressedPattern(compressedPattern);
+	drawCompressedPattern(ctx, compressedPattern, colors);
 }
 
 function compressPattern(pattern) {
-    return pattern.map(row => {
-        const compressedRow = [];
-        let currentColor = row[0][1]; // Asumiendo que cada celda es [x, colorValue]
-        let count = 1;
-        
-        for (let i = 1; i < row.length; i++) {
-            if (row[i][1] === currentColor) {
-                count++;
-            } else {
-                compressedRow.push([currentColor, count]);
-                currentColor = row[i][1];
-                count = 1;
-            }
-        }
-        compressedRow.push([currentColor, count]);
-        return compressedRow;
-    });
+	return pattern.map(row => {
+		const compressedRow = [];
+		let currentColor = row[0][1];
+		let count = 1;
+
+		for (let i = 1; i < row.length; i++) {
+			if (row[i][1] === currentColor) {
+				count++;
+			} else {
+				compressedRow.push([currentColor, count]);
+				currentColor = row[i][1];
+				count = 1;
+			}
+		}
+		compressedRow.push([currentColor, count]);
+		return compressedRow;
+	});
 }
 
-function drawCompressedPattern(ctx, compressedPattern, colors, scale=1) {
-	if (scale == null){
-		cellSize = 40;
-	}else{
-		cellSize = cellSize *= scale
-	}
-    let y = 0; 
-    compressedPattern.forEach(compressedRow => {
-        let x = 0; 
-        
-        compressedRow.forEach(([colorValue, repetitions]) => {
-            ctx.fillStyle = colors[colorValue] || '#000';
-            ctx.fillRect(x * cellSize, y * cellSize, repetitions * cellSize, cellSize);
-            ctx.strokeRect(x * cellSize, y * cellSize, repetitions * cellSize, cellSize);
+function drawCompressedPattern(ctx, compressedPattern, colors) {
+	let y = 0;
+	compressedPattern.forEach(compressedRow => {
+		let x = 0;
+		compressedRow.forEach(([colorValue, repetitions]) => {
+			ctx.fillStyle = colors[colorValue] || '#000';
+			ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, repetitions * CELL_SIZE, CELL_SIZE);
+			ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, repetitions * CELL_SIZE, CELL_SIZE);
 
-			 for (let i = 0; i <= repetitions; i++) {
-                ctx.beginPath();
-                ctx.moveTo((x + i) * cellSize, y * cellSize);
-                ctx.lineTo((x + i) * cellSize, (y + 1) * cellSize);
-                ctx.stroke();
-            }
+			for (let i = 0; i <= repetitions; i++) {
+				ctx.beginPath();
+				ctx.moveTo((x + i) * CELL_SIZE, y * CELL_SIZE);
+				ctx.lineTo((x + i) * CELL_SIZE, (y + 1) * CELL_SIZE);
+				ctx.stroke();
+			}
 
-            if (repetitions > 1) {
-				printText(ctx, repetitions, x, y, colors[colorValue])
-            }
-            
-            x += repetitions;
-        });
-        
-        y++;
-    });
+			if (repetitions > 1) {
+				printText(ctx, repetitions, x, y, colors[colorValue]);
+			}
+
+			x += repetitions;
+		});
+		y++;
+	});
 }
 
-function drawCanvas(pattern, scale = ZOOM_FACTOR) {
-	if (scale == null){
-		cellSize = 40;
-	}else{
-		cellSize = cellSize *= scale
-	}
-	let colors = getColors()
+function drawCanvas(pattern) {
+	const colors = getColors();
 	const canvas = document.getElementById("patternCanvas");
 	const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-	resizeCanvasToPattern(pattern)
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	const rows = pattern
-	const matrix = rows.map(row => row.map(cell => parseInt(cell[1])));
+	resizeCanvasToPattern(pattern);
+
+	const matrix = pattern.map(row => row.map(cell => parseInt(cell[1])));
 
 	matrix.forEach((row, i) => {
 		row.forEach((val, j) => {
 			ctx.fillStyle = colors[val] || '#000';
-			ctx.fillRect(j * cellSize, i * cellSize, cellSize, cellSize);
-			ctx.strokeRect(j * cellSize, i * cellSize, cellSize, cellSize); // opcional: borde
+			ctx.fillRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+			ctx.strokeRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 		});
 	});
 }
 
-
-function getColors(){
-	let colors =  Array.from(document.getElementsByName('colors'))
-		.map(input => input.value)
-	return colors
+function getColors() {
+	return Array.from(document.getElementsByName('colors')).map(input => input.value);
 }
 
-function printText(ctx, repetitions, x, y, color){
-	const centerX = (x + repetitions/2) * cellSize;
-	const centerY = (y + 0.5) * cellSize;
-	const radius = cellSize * 0.4; // Radio del círculo
+function printText(ctx, repetitions, x, y, color) {
+	const centerX = (x + repetitions / 2) * CELL_SIZE;
+	const centerY = (y + 0.5) * CELL_SIZE;
+	const radius = CELL_SIZE * 0.4;
 
-	// Dibujar círculo blanco
 	ctx.beginPath();
 	ctx.fillStyle = color;
 	ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
@@ -108,43 +92,35 @@ function printText(ctx, repetitions, x, y, color){
 	ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
 	ctx.stroke();
 
-	// Dibujar texto
 	ctx.fillStyle = '#000';
-	ctx.font = `${Math.max(10, cellSize/2.5)}px Arial`;
+	ctx.font = `${Math.max(10, CELL_SIZE / 2.5)}px Arial`;
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 	ctx.fillText(repetitions.toString(), centerX, centerY);
 }
 
-
 function resizeCanvasToPattern(pattern) {
-    const canvas = document.getElementById("patternCanvas");
-    const cols = pattern[0].length;
-    const rows = pattern.length;
-    
-    canvas.width = cols * cellSize;
-    canvas.height = rows * cellSize;
+	const canvas = document.getElementById("patternCanvas");
+	const cols = pattern[0].length;
+	const rows = pattern.length;
+	canvas.width = cols * CELL_SIZE;
+	canvas.height = rows * CELL_SIZE;
 }
 
-
-export function zoomIn(pattern) {
-    drawImg(pattern, 1.1); 
+function resizeCanvasToCompressedPattern(compressedPattern) {
+	const canvas = document.getElementById("patternCanvas");
+	const rows = compressedPattern.length;
+	const maxCols = Math.max(...compressedPattern.map(
+		row => row.reduce((sum, [, count]) => sum + count, 0)
+	));
+	canvas.width = maxCols * CELL_SIZE;
+	canvas.height = rows * CELL_SIZE;
 }
 
-export function zoomOut(pattern) {
-    drawImg(pattern, 0.9); 
-}
-
-export function zoomReset(pattern) {
-    drawImg(pattern, null);
-}
-
-export function drawImg(pattern, scale = 1){
+export function drawImg(pattern) {
 	const checkbox = document.getElementById('debugImg');
-	checkbox.checked ? drawDebugCanvas(pattern, scale) : drawCanvas(pattern, scale);
+	checkbox.checked ? drawDebugCanvas(pattern) : drawCanvas(pattern);
 }
-
-
 
 export function isCanvasBlank() {
 	const canvas = document.getElementById("patternCanvas");
@@ -154,3 +130,4 @@ export function isCanvasBlank() {
 	);
 	return !pixelBuffer.some(color => color !== 0);
 }
+

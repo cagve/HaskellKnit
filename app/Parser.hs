@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 
 module Parser where
 import Control.Monad (replicateM_, void, when)
@@ -7,7 +9,7 @@ import Control.Monad.Except (runExcept, throwError)
 import Control.Monad.State
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State (StateT, evalStateT)
-import Data.Aeson (FromJSON, ToJSON, eitherDecode)
+import Data.Aeson (FromJSON, ToJSON (toJSON), eitherDecode, object)
 import Data.Char (intToDigit, isSpace)
 import Data.List
 import qualified Data.Map as M
@@ -17,6 +19,7 @@ import Debug.Trace (trace, traceShow)
 import GHC.Generics (Generic)
 import Text.Parsec
 import Text.Parsec.String (Parser)
+import Data.Aeson.Types ((.=))
 
 -- | DATA TYPES
 
@@ -25,6 +28,14 @@ data Pattern = Pattern
     patGauge :: Maybe Gauge,
     patInstructions :: [Row]
   } deriving (Generic, Show, Eq)
+
+instance ToJSON Pattern where
+  toJSON (Pattern title mgauge instructions) =
+    object
+      [ "title" .= title,
+        "gauge" .= fmap show mgauge,
+        "instructions" .= map rowToList instructions
+      ]
 
 data Measure = Measure Int Int deriving (Generic, Show, Eq, Ord)
 instance ToJSON Measure
@@ -42,9 +53,11 @@ instance ToJSON Gauge
 data RepeatAmount
   = Times Int
   | Centimeters Double
-  deriving (Show, Eq)
+  deriving (Generic, Show, Eq, Ord)
+instance ToJSON RepeatAmount
 
-data Stitch = CO | K | P | YO | SSK | S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Show, Eq, Ord)
+data Stitch = CO | K | P | YO | SSK | S2KP2 | KTOG Int | M1R | M1L | WT | O | C Int deriving (Generic, Show, Eq, Ord)
+instance ToJSON Stitch
 
 data Expr
   = Single Stitch
@@ -52,7 +65,8 @@ data Expr
   | RepeatNeg Int [Expr]
   | RepeatBlock RepeatAmount [Row]
   | Zero [Expr]
-  deriving (Show, Eq)
+  deriving (Generic, Show, Eq, Ord)
+instance ToJSON Expr
 
 type Row = [Expr]
 
@@ -277,4 +291,15 @@ stitchToStr CO = "CO"
 stitchToStr S2KP2 = "S2KP2"
 stitchToStr (KTOG n) = "K" ++ [intToDigit n] ++ "TOG"
 stitchToStr (C n) = "C" ++ [intToDigit n]
+
+
+exprToStr :: Expr -> String
+exprToStr (Single s) = stitchToStr s
+exprToStr _ = ""
+
+rowToStr :: Row -> String
+rowToStr exprs = unwords (map exprToStr exprs)
+
+rowToList :: Row -> [String]
+rowToList = map exprToStr
 
