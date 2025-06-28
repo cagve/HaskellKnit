@@ -1,14 +1,17 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Explain where
 
 import Parser
+import qualified Data.Text as T
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON)
 import Data.Char (intToDigit)
 import Data.Maybe (mapMaybe)
 import Data.List (group, sort, intercalate)
+import Evaluate
 import qualified Data.Map as M
 
 
@@ -20,7 +23,7 @@ concatWithComma :: [String] -> String
 concatWithComma = foldr1 (\a b -> a ++ ", " ++ b)
 
 -- === Explicación de expresiones ===
-data Explanation 
+data Explanation
   = Line String
   | Block [String]
   deriving (Generic, Show, Eq)
@@ -46,32 +49,24 @@ explainExpr expr = case expr of
   Single st -> case st of
     K -> "K1"
     P -> "P1"
-    _ -> explainStitch st 
+    _ -> explainStitch st
 
   Zero exprList ->
     let inner = concatWithComma (map explainExpr exprList)
         wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
-    in "Repeat " ++ wrapped ++ " until the end of the row."
+    in "Repeat " ++ wrapped ++ " until the end of the row"
 
-  Repeat n exprList -> case exprList of
-      [Single st] -> case st of
-        K -> "K" ++ show n
-        P -> "P" ++ show n
-        _ -> explainStitch st ++ " " ++ show n ++ "."
-      _ ->
-        let inner = concatWithComma (map explainExpr exprList)
-            wrapped = "*" ++ inner ++ "*"
-        in "Repeat " ++ show n ++ " times: " ++ wrapped ++ "."
+  Repeat n exprList ->
+    let inner = concatWithComma (map explainExpr exprList)
+        wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
+    in if n == 1
+       then wrapped
+       else "Repeat " ++ show n ++ " times: " ++ wrapped ++ ""
 
-  RepeatNeg n exprList -> case exprList of 
-      [Single st] -> case st of
-        K -> "K" ++ show n
-        P -> "P" ++ show n
-        _ -> explainStitch st ++ " " ++ show n ++ "."
-      _ ->
-        let inner = concatWithComma (map explainExpr exprList)
-            wrapped = "*" ++ inner ++ "*"
-        in "Repeat " ++ show n ++ " times: " ++ wrapped ++ "."
+  RepeatNeg n exprList ->
+    let inner = concatWithComma (map explainExpr exprList)
+        wrapped = if length exprList > 1 then "*" ++ inner ++ "*" else inner
+    in "Repeat "++ wrapped ++  " until " ++ show n ++ " sts remains"
 
 
 explainExprRow :: [Expr] -> Explanation
@@ -81,9 +76,9 @@ explainExprRow exprs = Line $ intercalate ", " (map explainExpr exprs)
 explainCompactRow :: [Expr] -> Explanation
 explainCompactRow exprs = Line $ unwords $ map encodeGroup (group exprs)
   where
-    encodeGroup g  
-      | length g == 1 = explainExpr (head g) 
-      | otherwise = explainExpr (head g) ++ "x" ++ show (length g) 
+    encodeGroup g
+      | length g == 1 = explainExpr (head g)
+      | otherwise = explainExpr (head g) ++ "x" ++ show (length g)
 
 explainCompactRows :: [Row] -> [Explanation]
 explainCompactRows = map explainCompactRow
@@ -98,20 +93,20 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
     go :: Int -> [Row] -> [Explanation]
     go _ [] = []
     go n (expr:exprs) = case expr of
-       [RepeatBlock ra pat] -> 
+       [RepeatBlock ra pat] ->
         let innerExpl = explainExprRows pat  -- [Explanation]
             explSize  = length innerExpl
             labeledLines = zipWith (\c (Line s) -> c : ": " ++ s) ['A'..] innerExpl
             header = case ra of
               Times x ->
                 let numberOfRows = getRowRepetitionNumber  maybeGauge ra * explSize
-                    cms = getCmRepetitionNumber numberOfRows maybeGauge 
+                    cms = getCmRepetitionNumber numberOfRows maybeGauge
                     rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows)
                     labelRange = case innerExpl of
                       [] -> ""
                       _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show x ++ " times (" ++ show cms ++"cms)"
                 in rowRange ++ ": " ++ labelRange
-              Centimeters x -> 
+              Centimeters x ->
                 let repRows = getRowRepetitionNumber maybeGauge ra
                     reps = round (fromIntegral repRows / fromIntegral explSize)
                     rowRange = "Row " ++ show n ++ "-" ++ show (n + reps*explSize)
@@ -120,9 +115,9 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
                       _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show reps ++ " times (" ++ show x ++"cms)"
                 in rowRange ++ ": " ++ labelRange
             blockExplanation = Block (header : labeledLines)
-        in blockExplanation : go (n + 1) exprs      
+        in blockExplanation : go (n + 1) exprs
 
-       _ -> 
+       _ ->
         let (Line s) = explainExprRow expr
             header = "Row " ++ show n ++ ": " ++ s
           in Line header : go (n+1) exprs
@@ -133,43 +128,33 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
 
 
 explainCompactPattern :: Pattern -> [Explanation]
-explainCompactPattern (Pattern _ maybeGauge instructions) = go 1 instructions
+explainCompactPattern pat = case runEval 40 pat of
+  Left err -> [Line $ "Error: " ++ show err]
+  Right evaluated ->
+    zipWith explainRow [1..] evaluated
   where
-    go :: Int -> [Row] -> [Explanation]
-    go _ [] = []
-    go n (expr:exprs) = case expr of
-       [RepeatBlock ra pat] -> 
-        let innerExpl = explainCompactRows pat  -- [Explanation]
-            explSize  = length innerExpl
-            labeledLines = zipWith (\c (Line s) -> c : ": " ++ s) ['A'..] innerExpl
-            header = case ra of
-              Times x ->
-                let numberOfRows = getRowRepetitionNumber  maybeGauge ra * explSize
-                    cms = getCmRepetitionNumber numberOfRows maybeGauge 
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows)
-                    labelRange = case innerExpl of
-                      [] -> ""
-                      _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show x ++ " times (" ++ show cms ++"cms)"
-                in rowRange ++ ": " ++ labelRange
-              Centimeters x -> 
-                let repRows = getRowRepetitionNumber maybeGauge ra
-                    reps = round (fromIntegral repRows / fromIntegral explSize)
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + reps*explSize)
-                    labelRange = case innerExpl of
-                      [] -> ""
-                      _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show reps ++ " times (" ++ show x ++"cms)"
-                in rowRange ++ ": " ++ labelRange
-            blockExplanation = Block (header : labeledLines)
-        in blockExplanation : go (n + 1) exprs      
+    explainRow :: Int -> [Stitch] -> Explanation
+    explainRow rowNum stitches = 
+      let parts = filter (not . null) $ compress stitches
+      in Line $ "Row " ++ show rowNum ++ ": " ++ concatWithComma parts
 
-       _ -> 
-        let (Line s) = explainCompactRow expr
-            header = "Row " ++ show n ++ ": " ++ s
-          in Line header : go (n+1) exprs
+    compress :: [Stitch] -> [String]
+    compress [] = []
+    compress (s:ss) = go 1 s ss
+      where
+        go n curr [] = [format n curr]
+        go n curr (x:xs)
+          | x == curr = go (n+1) curr xs
+          | otherwise = format n curr : go 1 x xs
 
-    explanationToLines :: Explanation -> [String]
-    explanationToLines (Line s) = [s]
-    explanationToLines (Block ss) = ss
+        format n O  = "("++ show n ++ " in needle)"  -- Si el stitch es O, devuelve cadena vacía
+        format n WT = stitchToLongStr WT
+        format n s =
+          let desc = stitchToLongStr s
+          in if n == 1 
+               then desc ++ " stitch"
+               else desc ++ " " ++ show n ++ " stitches"
+
 
 
 -- Esta función toma todas las líneas del bloque y genera un resumen (puedes ajustarla a gusto)
@@ -186,13 +171,13 @@ allEqual (x:xs) = all (== x) xs
 
 
 getRowRepetitionNumber :: Maybe Gauge -> RepeatAmount -> Int
-getRowRepetitionNumber mg ra = case ra of 
+getRowRepetitionNumber mg ra = case ra of
   Times n -> n
   Centimeters c -> case mg of
           Just (Gauge (Measure cmWidth cmHeight) (StitchTension stWidth stHeight)) ->
               let stHeight' = fromIntegral stHeight :: Double
                   cmHeight' = fromIntegral cmHeight :: Double
-                  rowTimes = round (c * stHeight' / cmHeight') 
+                  rowTimes = round (c * stHeight' / cmHeight')
               in rowTimes
           Nothing -> 0
 

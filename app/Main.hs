@@ -173,7 +173,6 @@ main = do
 
   putStrLn "Servidor ejecutándose en http://localhost:8080"
   run 8080 $ corsMiddleware $ staticMiddleware app
-  -- test
 
 test :: IO()
 test = do

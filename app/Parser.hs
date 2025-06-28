@@ -202,7 +202,7 @@ repeatBlockParserExpr = do
   return rows
 
 expr :: Parser Expr
-expr = try repeatBlockExpr <|> try zeroExpr <|> try repeatExpr <|> try repeatNegExpr <|> stitchExpr
+expr = try repeatBlockExpr <|> try zeroExpr <|>  try repeatNegExpr <|> try repeatExpr <|> stitchExpr
 
 row :: Parser Row
 row =
