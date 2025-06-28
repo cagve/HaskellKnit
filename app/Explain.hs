@@ -93,34 +93,41 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
     go :: Int -> [Row] -> [Explanation]
     go _ [] = []
     go n (expr:exprs) = case expr of
-       [RepeatBlock ra pat] ->
-        let innerExpl = explainExprRows pat  -- [Explanation]
+      [RepeatBlock ra pat] ->
+        let innerExpl = explainExprRows pat
             explSize  = length innerExpl
+            numberOfRows = case ra of
+              Times x       -> getRowRepetitionNumber maybeGauge ra * explSize
+              Centimeters x ->
+                let repRows = getRowRepetitionNumber maybeGauge ra
+                in round (fromIntegral repRows / fromIntegral explSize) * explSize
+
             labeledLines = zipWith (\c (Line s) -> c : ": " ++ s) ['A'..] innerExpl
             header = case ra of
               Times x ->
-                let numberOfRows = getRowRepetitionNumber  maybeGauge ra * explSize
-                    cms = getCmRepetitionNumber numberOfRows maybeGauge
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows)
-                    labelRange = case innerExpl of
-                      [] -> ""
-                      _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show x ++ " times (" ++ show cms ++"cms)"
+                let cms = getCmRepetitionNumber numberOfRows maybeGauge
+                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows - 1)
+                    labelRange =
+                      if null innerExpl then ""
+                      else "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] "
+                           ++ show x ++ " times (" ++ show cms ++ "cms)"
                 in rowRange ++ ": " ++ labelRange
               Centimeters x ->
-                let repRows = getRowRepetitionNumber maybeGauge ra
-                    reps = round (fromIntegral repRows / fromIntegral explSize)
-                    rowRange = "Row " ++ show n ++ "-" ++ show (n + reps*explSize)
-                    labelRange = case innerExpl of
-                      [] -> ""
-                      _  -> "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] " ++ show reps ++ " times (" ++ show x ++"cms)"
+                let reps = round (fromIntegral (getRowRepetitionNumber maybeGauge ra) / fromIntegral explSize)
+                    rowRange = "Row " ++ show n ++ "-" ++ show (n + numberOfRows - 1)
+                    labelRange =
+                      if null innerExpl then ""
+                      else "Repeat rows [" ++ ['A'] ++ "-" ++ [toEnum (fromEnum 'A' + explSize - 1)] ++ "] "
+                           ++ show reps ++ " times (" ++ show x ++ "cms)"
                 in rowRange ++ ": " ++ labelRange
-            blockExplanation = Block (header : labeledLines)
-        in blockExplanation : go (n + 1) exprs
 
-       _ ->
+            blockExplanation = Block (header : labeledLines)
+        in blockExplanation : go (n + numberOfRows) exprs
+
+      _ ->
         let (Line s) = explainExprRow expr
             header = "Row " ++ show n ++ ": " ++ s
-          in Line header : go (n+1) exprs
+        in Line header : go (n + 1) exprs
 
     explanationToLines :: Explanation -> [String]
     explanationToLines (Line s) = [s]

@@ -96,7 +96,7 @@ function updatePattern(pattern){
 	fetch(API_URL_PATTERNS+"/"+pattern)
 		.then(res => res.json())
 		.then(data=>{
-			console.log(data.gauge)
+			console.log(data)
 			let linesCompact = data.patternCompact
 			titleDOM.innerHTML = "Pattern: " + pattern
 			titleDOM.setAttribute("name", pattern)
