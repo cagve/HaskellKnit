@@ -80,7 +80,6 @@ function drawCanvas() {
 
 	resizeCanvasToPattern();
 
-	console.log(currentPattern)
 	const matrix = currentPattern.map(row => row.map(cell => parseInt(cell[1])));
 	const l = matrix.length
 
@@ -91,8 +90,6 @@ function drawCanvas() {
 			ctx.strokeRect(j * CELL_SIZE, i * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 		});
 	});
-	console.log(l)
-	console.log(currentRow)
 	if (currentRow !== null) {
 		ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // amarillo translúcido tipo resaltador
 		ctx.fillRect(0, (l-1-currentRow) * CELL_SIZE, canvas.width, CELL_SIZE);

@@ -129,7 +129,6 @@ function updatePattern(pattern){
 		})
 		.catch(err => {
 			alert("Error de lectura");
-			console.log(err)
 		});
 
 }
