@@ -114,18 +114,10 @@ function updatePattern(pattern){
 			})
 
 			let linesExpr = data.patternExplanation
-			linesExpr.forEach((line, idx) => {
-				if (!line){
-					return
-				}
-				const li = document.createElement('li')
-				li.addEventListener('click', () => {
-					currentRow = idx;   // actualizar fila seleccionada
-					updateRow();    
-				});
-				exprInstructions.appendChild(li)
-				li.textContent = line.contents
-			})
+			const elems = createInstructionElements(linesExpr);
+			elems.forEach(el => exprInstructions.appendChild(el));
+
+
 			if (data.colorPattern){
 				updateImg(data.patternStruct.instructions);
 			}
@@ -289,5 +281,67 @@ function resetImg(){
 		elem.remove();
 	}
 }
+
+function createInstructionElements(linesExpr) {
+  const elements = [];
+
+  linesExpr.forEach((item, idx) => {
+    if (!item) return;
+
+    if (item.tag === "Line") {
+      const li = document.createElement('li');
+      li.textContent = item.contents;
+      li.addEventListener('click', () => {
+        currentRow = idx;
+        updateRow();
+      });
+      elements.push(li);
+
+    } else if (item.tag === "Block") {
+      const blockContainer = document.createElement('li');
+      blockContainer.style.cursor = 'pointer';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'center';
+
+      const title = document.createElement('span');
+      title.textContent = item.contents[0];
+
+      const toggleIcon = document.createElement('span');
+      toggleIcon.textContent = '▶';
+      toggleIcon.style.marginLeft = '8px';
+      toggleIcon.style.fontSize = '0.9em';
+
+      header.appendChild(title);
+      header.appendChild(toggleIcon);
+      blockContainer.appendChild(header);
+
+      const subList = document.createElement('ul');
+      subList.style.display = 'none';
+      subList.style.marginTop = '5px';
+      blockContainer.appendChild(subList);
+
+      item.contents.slice(1).forEach((subItem) => {
+        const subLi = document.createElement('li');
+        subLi.textContent = subItem;
+        subList.appendChild(subLi);
+      });
+
+      header.addEventListener('click', (e) => {
+        e.stopPropagation(); // evitar conflictos si hay eventos padres
+        const isVisible = subList.style.display === 'block';
+        subList.style.display = isVisible ? 'none' : 'block';
+        toggleIcon.textContent = isVisible ? '▶' : '▼';
+      });
+
+      elements.push(blockContainer);
+    }
+  });
+
+  return elements;
+}
+
 
 loadFiles();
