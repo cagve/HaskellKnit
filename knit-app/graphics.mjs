@@ -20,9 +20,10 @@ function drawDebugCanvas() {
 	const compressedPattern = compressPattern();
 	resizeCanvasToCompressedPattern(compressedPattern);
 	drawCompressedPattern(ctx, compressedPattern, colors);
+	const l = compressedPattern.length
 	if (currentRow !== null) {
 		ctx.fillStyle = 'rgba(255, 255, 0, 0.4)'; // amarillo translúcido tipo resaltador
-		ctx.fillRect(0, currentRow * CELL_SIZE, canvas.width, CELL_SIZE);
+		ctx.fillRect(0, (l-1-currentRow) * CELL_SIZE, canvas.width, CELL_SIZE);
 	}
 }
 

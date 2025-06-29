@@ -128,7 +128,7 @@ function updatePattern(pattern){
 			updateRow()
 		})
 		.catch(err => {
-			alert("Error de lectura");
+			alert("Error de lectura"+ err);
 		});
 
 }

@@ -12,6 +12,7 @@ import Data.Char (intToDigit)
 import Data.Maybe (mapMaybe)
 import Data.List (group, sort, intercalate)
 import Evaluate
+import Data.Either (fromRight)
 import qualified Data.Map as M
 
 
@@ -88,7 +89,15 @@ explainExprRows = map explainExprRow
 
 
 explainExprPattern :: Pattern -> [Explanation]
-explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
+explainExprPattern pat@(Pattern _ maybeGauge instructions) = 
+  case runEval 40 pat of
+    Left _ -> go 1 instructions  -- si hay error, seguimos con las instrucciones originales
+    Right stitchGrid ->
+      let modifiedInstructions =
+            if isColorPattern stitchGrid
+              then modifyInstructions instructions  -- define tú esta función
+              else instructions
+      in go 1 modifiedInstructions
   where
     go :: Int -> [Row] -> [Explanation]
     go _ [] = []
@@ -136,13 +145,20 @@ explainExprPattern (Pattern _ maybeGauge instructions) = go 1 instructions
 
 
 explainCompactPattern :: Pattern -> [Explanation]
-explainCompactPattern pat = case runEval 40 pat of
-  Left err -> [Line $ "Error: " ++ show err]
-  Right evaluated ->
-    zipWith explainRow [1..] evaluated
+explainCompactPattern pat@(Pattern title gauge instructions ) =
+  case runEval 40 pat of
+    Left err -> [Line $ "Error: " ++ show err]
+    Right evaluated ->
+      let modifiedInstructions =
+            if isColorPattern evaluated
+              then modifyInstructions instructions  -- [Instruction]
+              else instructions
+          modifiedPattern = Pattern {patTitle=title, patInstructions=modifiedInstructions, patGauge=gauge}
+          stitchGrid = fromRight (error "runEval failed unexpectedly") (runEval 40 modifiedPattern)
+      in zipWith explainRow [1..] stitchGrid
   where
     explainRow :: Int -> [Stitch] -> Explanation
-    explainRow rowNum stitches = 
+    explainRow rowNum stitches =
       let parts = filter (not . null) $ compress stitches
       in Line $ "Row " ++ show rowNum ++ ": " ++ concatWithComma parts
 
@@ -155,27 +171,15 @@ explainCompactPattern pat = case runEval 40 pat of
           | x == curr = go (n+1) curr xs
           | otherwise = format n curr : go 1 x xs
 
-        format n O  = "("++ show n ++ " in needle)"  -- Si el stitch es O, devuelve cadena vacía
+        format n O  = "(" ++ show n ++ " in needle)"
         format n WT = stitchToLongStr WT
         format n s =
           let desc = stitchToLongStr s
-          in if n == 1 
+          in if n == 1
                then desc ++ " stitch"
                else desc ++ " " ++ show n ++ " stitches"
 
 
-
--- Esta función toma todas las líneas del bloque y genera un resumen (puedes ajustarla a gusto)
-summarizeBlock :: [String] -> String
-summarizeBlock linesInBlock =
-  if allEqual linesInBlock
-    then head linesInBlock
-    else intercalate " /n " linesInBlock
-
--- Utilidad para ver si todos los elementos son iguales
-allEqual :: Eq a => [a] -> Bool
-allEqual [] = True
-allEqual (x:xs) = all (== x) xs
 
 
 getRowRepetitionNumber :: Maybe Gauge -> RepeatAmount -> Int
@@ -202,5 +206,11 @@ getCmRepetitionNumber n mg  = case mg of
       in cmValue
     _ -> 0
 
-countExprs :: [Expr] -> M.Map Expr Int
-countExprs = foldr (\e -> M.insertWith (+) e 1) M.empty
+modifyInstructions :: [Row] -> [Row]
+modifyInstructions rows =
+  zipWith applyDirection [0..] (reverse rows)
+  where
+    applyDirection :: Int -> Row -> Row
+    applyDirection i row
+      | even i    = reverse row  
+      | otherwise = row          
