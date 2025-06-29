@@ -328,8 +328,68 @@ main h2 {
 	gap:10px;
 }
 
-#imgNav{
-	display:flex;
-	justify-content:space-between;
-
+#imgNav {
+  display: flex;
+  align-items: center;     
+  gap: 1rem;                
+  justify-content: space-between;
 }
+
+
+
+#imgNav input[type="color"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+
+  width: 40px;
+  margin-left: 5px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px #ccc inset;
+}
+
+/* WebKit (Chrome, Safari) */
+#imgNav input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 50%;
+}
+
+#imgNav input[type="color"]::-webkit-color-swatch {
+  border: 2px solid #666;
+  border-radius: 50%;
+}
+
+/* Firefox */
+#imgNav input[type="color"]::-moz-color-swatch {
+  border: 2px solid #666;
+  border-radius: 50%;
+}
+
+
+
+
+/* Estilo del checkbox */
+#imgNav input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #42a5f5; /* Azul claro */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Hover visual */
+#imgNav input[type="checkbox"]:hover {
+  filter: brightness(1.2);
+}
+
+/* Opcional: checkbox con "tick" más claro */
+#imgNav input[type="checkbox"]:checked {
+  outline: 2px solid #42a5f5;
+  outline-offset: 2px;
+}
+

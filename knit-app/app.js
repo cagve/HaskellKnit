@@ -231,32 +231,48 @@ document.querySelectorAll('input[name="appState"]').forEach(radio => {
 });
 
 function updateImg(pattern, colors = colorMap){
-	setPattern(pattern)
-	document.getElementById("patternCanvas").style.display="block";
-	let divColorPickerBox = document.createElement('div')
-	divColorPickerBox.id = "colorPickerBox"
-	let divNav = document.createElement('div')
-	let debugCheckbox = document.createElement('input')
-	debugCheckbox.id = "debugImg"
-	debugCheckbox.type="checkbox"
-	debugCheckbox.onchange = () => drawImg()
-	divNav.id = "imgNav"
-	for (let i = 0; i < colors.length; i++){
-		let inputColor = document.createElement('input')
-		inputColor.type = "color"
-		inputColor.name = "colors"
-		inputColor.id = "color"+1
-		inputColor.onchange = () => drawImg()
-		inputColor.value = (i>colors.length) ? '#ffffff' : colors[i];
-		divNav.appendChild(inputColor)
-	}
-	divNav.appendChild(debugCheckbox)
-	imgBoxDOM.prepend(divNav)
+	setPattern(pattern);
+	document.getElementById("patternCanvas").style.display = "block";
 
-	// CHECKBOX Tex
-	const text = document.createTextNode(" Magic marker"); 
-	debugCheckbox.parentNode?.insertBefore(text, debugCheckbox.nextSibling);
-	drawImg()
+	let divColorPickerBox = document.createElement('div');
+	divColorPickerBox.id = "colorPickerBox";
+
+	let divNav = document.createElement('div');
+	divNav.id = "imgNav";
+
+	let divColor = document.createElement('div');
+
+	// Crear inputs de color
+	for (let i = 0; i < colors.length; i++){
+		let inputColor = document.createElement('input');
+		inputColor.type = "color";
+		inputColor.name = "colors";
+		inputColor.id = "color" + i;
+		inputColor.value = colors[i] || '#ffffff';  // fijar valor correctamente
+		inputColor.onchange = () => drawImg();
+		divColor.appendChild(inputColor);
+	}
+	divNav.appendChild(divColor)
+
+	// Crear label con checkbox + texto
+	let labelCheckbox = document.createElement('label');
+	labelCheckbox.htmlFor = "debugImg";
+	labelCheckbox.style.cursor = "pointer";
+	labelCheckbox.style.marginLeft = "1rem";
+
+	let debugCheckbox = document.createElement('input');
+	debugCheckbox.id = "debugImg";
+	debugCheckbox.type = "checkbox";
+	debugCheckbox.onchange = () => drawImg();
+
+	labelCheckbox.appendChild(debugCheckbox);
+	labelCheckbox.appendChild(document.createTextNode(" Magic marker"));
+
+	divNav.appendChild(labelCheckbox);
+
+	imgBoxDOM.prepend(divNav);
+
+	drawImg();
 }
 
 
