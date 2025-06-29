@@ -1,4 +1,4 @@
-import {setCurrentRow, drawImg, setPattern} from './graphics.mjs';
+import {setCurrentRow, drawImg, setPattern, isCanvasBlank} from './graphics.mjs';
 
 const API_URL = "http://127.0.0.1:8080";
 const API_URL_PATTERNS = API_URL+"/patterns";
@@ -8,7 +8,18 @@ let APP_STATE = 0;
 let currentRow = 0;
 
 
-const colorMap = ['#ffffff', '#42a5f5',  '#ef6c00'] // naranja
+const colorMap = [
+  '#ffffff', // C0 - blanco
+  '#42a5f5', // C1 - azul claro
+  '#ef6c00', // C2 - naranja
+  '#66bb6a', // C3 - verde claro
+  '#ab47bc', // C4 - morado
+  '#ffa726', // C5 - naranja claro
+  '#8d6e63', // C6 - marrón
+  '#26c6da', // C7 - cian
+  '#d4e157', // C8 - lima
+  '#ff7043'  // C9 - rojo anaranjado
+];
 
 const shortRadio = document.getElementById("shortRadio");
 const extendedRadio = document.getElementById("extendedRadio");
@@ -25,6 +36,7 @@ const nextBtn = document.getElementById('nextRow');
 const rowIndicator = document.getElementById('currentRowIndicator');
 const exprInstructions = document.getElementById('patternExprInstructions');
 const clusterInstructions = document.getElementById('patternClusterInstructions');
+const emptyMsg = document.getElementById('emptyMsg');
 
 const currentFiles = [];
 
@@ -121,7 +133,10 @@ function updatePattern(pattern){
 
 
 			if (data.colorPattern){
-				updateImg(data.patternStruct.instructions);
+				const flatArray = data.patternStruct.instructions.flat();
+				const uniqueElements = new Set(flatArray);
+				const n = uniqueElements.size;
+				updateImg(data.patternStruct.instructions, colorMap.slice(0,n));
 			}
 			APP_STATE = 0;
 			updateAppState()
@@ -147,7 +162,12 @@ fileInput.onchange = function() {
 function updateRow(){
 	let li_elements = ""
 	if (APP_STATE === 2) {
-		 drawImg()
+		if (!isCanvasBlank()){
+			 emptyMsg.style.display="none"
+			 drawImg()
+		}else {
+			 emptyMsg.style.display="block"
+		}
 	} else{
 		if (APP_STATE === 1) {
 			li_elements = clusterInstructions.querySelectorAll('li');
